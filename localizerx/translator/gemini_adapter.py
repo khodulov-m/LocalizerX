@@ -17,7 +17,7 @@ from localizerx.utils.placeholders import mask_placeholders, unmask_placeholders
 from .base import TranslationRequest, TranslationResult, Translator
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
 
 class GeminiTranslator(Translator):

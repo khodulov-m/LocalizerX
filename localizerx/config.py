@@ -21,7 +21,7 @@ class TranslatorConfig(BaseModel):
     """Configuration for translation provider."""
 
     provider: str = "gemini"
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-2.5-flash-lite"
     batch_size: int = Field(default=20, ge=1, le=50)
     max_retries: int = Field(default=3, ge=1, le=10)
 
@@ -104,7 +104,7 @@ cache_enabled = true
 provider = "gemini"
 
 # Gemini model to use
-model = "gemini-2.0-flash"
+model = "gemini-2.5-flash-lite"
 
 # Number of strings per API call
 batch_size = 20
