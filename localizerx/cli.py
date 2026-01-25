@@ -18,7 +18,14 @@ from rich.progress import (
 from rich.table import Table
 
 from localizerx import __version__
-from localizerx.config import Config, create_default_config, get_cache_dir, load_config
+from localizerx.config import (
+    Config,
+    DEFAULT_MODEL,
+    GEMINI_MODELS,
+    create_default_config,
+    get_cache_dir,
+    load_config,
+)
 from localizerx.io.xcstrings import read_xcstrings, write_xcstrings
 from localizerx.parser.model import Translation
 from localizerx.translator.base import TranslationRequest
@@ -121,6 +128,13 @@ def translate(
             max=50,
         ),
     ] = None,
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model", "-m",
+            help=f"Gemini model to use (see 'localizerx models' for list)",
+        ),
+    ] = None,
 ) -> None:
     """Translate an .xcstrings file to target languages."""
     # Load configuration
@@ -137,6 +151,10 @@ def translate(
     if invalid_langs:
         codes = ", ".join(invalid_langs)
         console.print(f"[yellow]Warning:[/yellow] Unrecognized language codes: {codes}")
+
+    # Validate model
+    if model and model not in GEMINI_MODELS:
+        console.print(f"[yellow]Warning:[/yellow] Unknown model '{model}'. Use 'localizerx models' to see available models.")
 
     # Find xcstrings files
     files = _find_xcstrings_files(path)
@@ -162,6 +180,7 @@ def translate(
             overwrite=overwrite,
             backup=backup,
             batch_size=batch_size,
+            model=model,
         )
 
 
@@ -185,6 +204,7 @@ def _process_file(
     overwrite: bool,
     backup: bool,
     batch_size: int | None,
+    model: str | None,
 ) -> None:
     """Process a single xcstrings file."""
     console.print(f"[bold]Processing:[/bold] {file_path}")
@@ -235,6 +255,7 @@ def _process_file(
             preview=preview,
             backup=backup,
             batch_size=batch_size,
+            model=model,
         )
     )
 
@@ -273,13 +294,15 @@ async def _translate_file(
     preview: bool,
     backup: bool,
     batch_size: int | None,
+    model: str | None,
 ) -> None:
     """Perform translations and update catalog."""
     cache_dir = get_cache_dir(config)
     actual_batch_size = batch_size or config.translator.batch_size
+    actual_model = model or config.translator.model
 
     async with GeminiTranslator(
-        model=config.translator.model,
+        model=actual_model,
         batch_size=actual_batch_size,
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,
@@ -370,6 +393,21 @@ def init(
     """Create a default configuration file."""
     config_path = create_default_config(path)
     console.print(f"[green]Created configuration file:[/green] {config_path}")
+
+
+@app.command()
+def models() -> None:
+    """List available Gemini models."""
+    table = Table(title="Available Gemini Models")
+    table.add_column("Model", style="cyan")
+    table.add_column("Default", style="green")
+
+    for model in GEMINI_MODELS:
+        is_default = "✓" if model == DEFAULT_MODEL else ""
+        table.add_row(model, is_default)
+
+    console.print(table)
+    console.print(f"\nUse [cyan]--model[/cyan] option or set in config.toml")
 
 
 @app.command()

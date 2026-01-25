@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 if sys.version_info >= (3, 11):
@@ -16,12 +18,21 @@ else:
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "localizerx" / "config.toml"
 DEFAULT_CACHE_DIR = Path.home() / ".cache" / "localizerx"
 
+# Available Gemini models
+GEMINI_MODELS = [
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+]
+
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
+
 
 class TranslatorConfig(BaseModel):
     """Configuration for translation provider."""
 
     provider: str = "gemini"
-    model: str = "gemini-2.5-flash-lite"
+    model: str = DEFAULT_MODEL
     batch_size: int = Field(default=20, ge=1, le=50)
     max_retries: int = Field(default=3, ge=1, le=10)
 

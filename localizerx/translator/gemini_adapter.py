@@ -11,13 +11,13 @@ from typing import Any
 
 import httpx
 
+from localizerx.config import DEFAULT_MODEL
 from localizerx.utils.locale import get_language_name
 from localizerx.utils.placeholders import mask_placeholders, unmask_placeholders
 
 from .base import TranslationRequest, TranslationResult, Translator
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
 
 class GeminiTranslator(Translator):
