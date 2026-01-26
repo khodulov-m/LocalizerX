@@ -20,6 +20,20 @@ from .base import TranslationRequest, TranslationResult, Translator
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
+def _preserve_whitespace(original: str, translated: str) -> str:
+    """Preserve leading/trailing whitespace from original in translated text."""
+    # Get leading whitespace from original
+    leading = len(original) - len(original.lstrip())
+    leading_ws = original[:leading] if leading else ""
+
+    # Get trailing whitespace from original
+    trailing = len(original) - len(original.rstrip())
+    trailing_ws = original[-trailing:] if trailing else ""
+
+    # Apply to translated text (strip it first to ensure clean result)
+    return leading_ws + translated.strip() + trailing_ws
+
+
 class GeminiTranslator(Translator):
     """Translation adapter using Google's Gemini API."""
 
@@ -123,6 +137,9 @@ class GeminiTranslator(Translator):
         # Unmask placeholders
         translated = unmask_placeholders(translated_masked, masked.placeholders)
 
+        # Preserve original whitespace
+        translated = _preserve_whitespace(text, translated)
+
         # Cache result
         self._set_cached(text, translated, source_lang, target_lang)
 
@@ -170,6 +187,8 @@ class GeminiTranslator(Translator):
                 batch, batch_results
             ):
                 translated = unmask_placeholders(translated_masked, placeholders)
+                # Preserve original whitespace
+                translated = _preserve_whitespace(req.text, translated)
                 results[idx] = TranslationResult(
                     key=req.key,
                     original=req.text,
