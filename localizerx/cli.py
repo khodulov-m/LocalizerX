@@ -19,9 +19,9 @@ from rich.table import Table
 
 from localizerx import __version__
 from localizerx.config import (
-    Config,
     DEFAULT_MODEL,
     GEMINI_MODELS,
+    Config,
     create_default_config,
     get_cache_dir,
     load_config,
@@ -39,7 +39,7 @@ from localizerx.utils.locale import (
 app = typer.Typer(
     name="localizerx",
     help="Translate Xcode String Catalogs (.xcstrings) using Gemini API",
-    no_args_is_help=True,
+    invoke_without_command=True,
 )
 console = Console()
 
@@ -50,33 +50,118 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: Annotated[
         Optional[bool],
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
     ] = None,
+    to: Annotated[
+        Optional[str],
+        typer.Option(
+            "--to", "-t",
+            help="Target languages (comma-separated, e.g., 'fr,es,de')",
+        ),
+    ] = None,
+    src: Annotated[
+        str,
+        typer.Option(
+            "--src", "-s",
+            help="Source language",
+        ),
+    ] = "en",
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", "-n",
+            help="Show what would be translated without making changes",
+        ),
+    ] = False,
+    preview: Annotated[
+        bool,
+        typer.Option(
+            "--preview", "-p",
+            help="Show proposed translations before applying",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Overwrite existing translations",
+        ),
+    ] = False,
+    no_backup: Annotated[
+        bool,
+        typer.Option(
+            "--no-backup",
+            help="Don't create backup before writing changes",
+        ),
+    ] = False,
+    config_path: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--config", "-c",
+            help="Path to configuration file",
+        ),
+    ] = None,
+    batch_size: Annotated[
+        Optional[int],
+        typer.Option(
+            "--batch-size",
+            help="Number of strings per API call",
+            min=1,
+            max=50,
+        ),
+    ] = None,
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model", "-m",
+            help="Gemini model to use (see 'localizerx models' for list)",
+        ),
+    ] = None,
 ) -> None:
-    """LocalizerX - Translate Xcode String Catalogs using Gemini API."""
-    pass
+    """LocalizerX - Translate Xcode String Catalogs using Gemini API.
+
+    Quick usage: localizerx --to ru,fr,de
+    """
+    # If no subcommand and --to is provided, run translate
+    if ctx.invoked_subcommand is None and to is not None:
+        _run_translate(
+            path=None,
+            to=to,
+            src=src,
+            dry_run=dry_run,
+            preview=preview,
+            overwrite=overwrite,
+            backup=not no_backup,
+            config_path=config_path,
+            batch_size=batch_size,
+            model=model,
+        )
+    elif ctx.invoked_subcommand is None:
+        # No subcommand and no --to, show help
+        console.print(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @app.command()
 def translate(
     path: Annotated[
-        Path,
+        Optional[Path],
         typer.Argument(
-            help="Path to .xcstrings file or directory containing .xcstrings files",
-            exists=True,
+            help="Path to .xcstrings file or directory (auto-detected if omitted)",
         ),
-    ],
+    ] = None,
     to: Annotated[
         str,
         typer.Option(
             "--to", "-t",
             help="Target languages (comma-separated, e.g., 'fr,es,de')",
         ),
-    ],
+    ] = "",
     src: Annotated[
         str,
         typer.Option(
@@ -132,11 +217,42 @@ def translate(
         Optional[str],
         typer.Option(
             "--model", "-m",
-            help=f"Gemini model to use (see 'localizerx models' for list)",
+            help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
 ) -> None:
     """Translate an .xcstrings file to target languages."""
+    if not to:
+        console.print("[red]Error:[/red] --to option is required (e.g., --to ru,fr,de)")
+        raise typer.Exit(1)
+
+    _run_translate(
+        path=path,
+        to=to,
+        src=src,
+        dry_run=dry_run,
+        preview=preview,
+        overwrite=overwrite,
+        backup=backup,
+        config_path=config_path,
+        batch_size=batch_size,
+        model=model,
+    )
+
+
+def _run_translate(
+    path: Path | None,
+    to: str,
+    src: str,
+    dry_run: bool,
+    preview: bool,
+    overwrite: bool,
+    backup: bool,
+    config_path: Path | None,
+    batch_size: int | None,
+    model: str | None,
+) -> None:
+    """Core translation logic."""
     # Load configuration
     config = load_config(config_path)
 
@@ -154,13 +270,34 @@ def translate(
 
     # Validate model
     if model and model not in GEMINI_MODELS:
-        console.print(f"[yellow]Warning:[/yellow] Unknown model '{model}'. Use 'localizerx models' to see available models.")
+        console.print(
+            f"[yellow]Warning:[/yellow] Unknown model '{model}'. "
+            "Use 'localizerx models' to see available models."
+        )
 
-    # Find xcstrings files
-    files = _find_xcstrings_files(path)
-    if not files:
-        console.print(f"[red]Error:[/red] No .xcstrings files found at {path}")
-        raise typer.Exit(1)
+    # Auto-detect xcstrings files if path not provided
+    if path is None:
+        search_path = Path.cwd()
+        files = _find_xcstrings_files(search_path)
+        if not files:
+            console.print("[red]Error:[/red] No .xcstrings files found in current directory")
+            raise typer.Exit(1)
+
+        # If multiple files found, prompt user to select
+        if len(files) > 1:
+            files = _prompt_file_selection(files)
+            if not files:
+                console.print("[yellow]Cancelled[/yellow]")
+                raise typer.Exit(0)
+    else:
+        # Validate path exists
+        if not path.exists():
+            console.print(f"[red]Error:[/red] Path does not exist: {path}")
+            raise typer.Exit(1)
+        files = _find_xcstrings_files(path)
+        if not files:
+            console.print(f"[red]Error:[/red] No .xcstrings files found at {path}")
+            raise typer.Exit(1)
 
     console.print(f"Found {len(files)} .xcstrings file(s)")
     console.print(f"Source: {get_language_name(src)} ({src})")
@@ -191,7 +328,58 @@ def _find_xcstrings_files(path: Path) -> list[Path]:
             return [path]
         return []
 
-    return list(path.rglob("*.xcstrings"))
+    return sorted(path.rglob("*.xcstrings"))
+
+
+def _prompt_file_selection(files: list[Path]) -> list[Path]:
+    """Prompt user to select which files to translate."""
+    console.print(f"Found {len(files)} .xcstrings file(s):\n")
+
+    for i, f in enumerate(files, 1):
+        # Show relative path from cwd for readability
+        try:
+            rel_path = f.relative_to(Path.cwd())
+        except ValueError:
+            rel_path = f
+        console.print(f"  [cyan]{i}[/cyan]. {rel_path}")
+
+    console.print("\n  [cyan]a[/cyan]. All files")
+    console.print()
+
+    choice = typer.prompt("Select file(s) to translate (number, comma-separated, or 'a' for all)")
+    choice = choice.strip().lower()
+
+    if choice == "a":
+        return files
+
+    # Parse selection
+    selected = []
+    try:
+        for part in choice.split(","):
+            part = part.strip()
+            if "-" in part:
+                # Range like "1-3"
+                start, end = map(int, part.split("-"))
+                for i in range(start, end + 1):
+                    if 1 <= i <= len(files):
+                        selected.append(files[i - 1])
+            else:
+                idx = int(part)
+                if 1 <= idx <= len(files):
+                    selected.append(files[idx - 1])
+    except ValueError:
+        console.print("[red]Error:[/red] Invalid selection")
+        return []
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique = []
+    for f in selected:
+        if f not in seen:
+            seen.add(f)
+            unique.append(f)
+
+    return unique
 
 
 def _process_file(
@@ -407,7 +595,7 @@ def models() -> None:
         table.add_row(model, is_default)
 
     console.print(table)
-    console.print(f"\nUse [cyan]--model[/cyan] option or set in config.toml")
+    console.print("\nUse [cyan]--model[/cyan] option or set in config.toml")
 
 
 @app.command()
