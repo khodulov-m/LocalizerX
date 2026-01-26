@@ -33,7 +33,7 @@ class TranslatorConfig(BaseModel):
 
     provider: str = "gemini"
     model: str = DEFAULT_MODEL
-    batch_size: int = Field(default=20, ge=1, le=50)
+    batch_size: int = Field(default=100, ge=1, le=100)
     max_retries: int = Field(default=3, ge=1, le=10)
 
 
@@ -118,7 +118,7 @@ provider = "gemini"
 model = "gemini-2.5-flash-lite"
 
 # Number of strings per API call
-batch_size = 20
+batch_size = 100
 
 # Maximum retry attempts for failed requests
 max_retries = 3

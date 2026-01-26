@@ -79,8 +79,8 @@ Config is created at `~/.config/localizerx/config.toml`:
 
 ```toml
 [translator]
-model = "gemini-2.0-flash"
-batch_size = 10
+model = "gemini-2.5-flash-lite"
+batch_size = 100
 max_retries = 3
 
 [cache]
@@ -122,7 +122,7 @@ localizerx translate ./MyApp --to fr,es,de
 | `--preview` | `-p` | Preview translations before applying |
 | `--overwrite` | | Overwrite existing translations |
 | `--no-backup` | | Don't create backup before changes |
-| `--batch-size` | | Strings per API call (1-50) |
+| `--batch-size` | | Strings per API call (1-100, default: 100) |
 | `--model` | `-m` | Gemini model to use |
 | `--config` | `-c` | Path to configuration file |
 

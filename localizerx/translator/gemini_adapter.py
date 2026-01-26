@@ -41,7 +41,7 @@ class GeminiTranslator(Translator):
         self,
         api_key: str | None = None,
         model: str = DEFAULT_MODEL,
-        batch_size: int = 20,
+        batch_size: int = 100,
         max_retries: int = 3,
         cache_dir: Path | None = None,
     ):

@@ -115,7 +115,7 @@ def main(
             "--batch-size",
             help="Number of strings per API call",
             min=1,
-            max=50,
+            max=100,
         ),
     ] = None,
     model: Annotated[
@@ -213,7 +213,7 @@ def translate(
             "--batch-size",
             help="Number of strings per API call",
             min=1,
-            max=50,
+            max=100,
         ),
     ] = None,
     model: Annotated[
