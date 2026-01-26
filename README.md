@@ -1,80 +1,81 @@
 # LocalizerX
 
-CLI-инструмент для автоматического перевода Xcode String Catalogs (`.xcstrings`) с использованием Gemini API.
+CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`) and App Store metadata using Gemini API.
 
-## Возможности
+## Features
 
-- Перевод `.xcstrings` файлов на несколько языков одной командой
-- Сохранение плейсхолдеров (`%@`, `%d`, `{name}`) при переводе
-- Поддержка плюрализации и форм склонения
-- Учёт комментариев разработчика для контекста перевода
-- Кэширование переводов в SQLite для экономии API-запросов
-- Создание бэкапов перед изменениями
+- Translate `.xcstrings` files to multiple languages with a single command
+- Translate fastlane App Store metadata (name, subtitle, description, keywords, etc.)
+- Preserve placeholders (`%@`, `%d`, `{name}`) during translation
+- Support for pluralization and declension forms
+- Use developer comments for translation context
+- SQLite caching to reduce API calls
+- Automatic backups before changes
 
-## Установка
+## Installation
 
-### Требования
+### Requirements
 
 - macOS
 - Python 3.10+
-- API ключ Gemini
+- Gemini API key
 
-### Через pipx (рекомендуется)
+### Via pipx (recommended)
 
 ```bash
-# Установить pipx если ещё не установлен
+# Install pipx if not already installed
 brew install pipx
 pipx ensurepath
 
-# Установить LocalizerX
+# Install LocalizerX
 pipx install localizerx
 ```
 
-### Из исходников
+### From source
 
 ```bash
-# Клонировать репозиторий
+# Clone the repository
 git clone https://github.com/localizerx/localizerx.git
 cd localizerx
 
-# Установить глобально
+# Install globally
 pipx install .
 
-# Или для разработки (изменения применяются сразу)
+# Or for development (changes apply immediately)
 pipx install -e .
 ```
 
-### Через pip
+### Via pip
 
 ```bash
 pip install localizerx
 ```
 
-## Настройка
+## Setup
 
-### API ключ
+### API Key
 
-Установите переменную окружения с вашим Gemini API ключом:
+Set the environment variable with your Gemini API key:
 
 ```bash
 export GEMINI_API_KEY="your-api-key"
 ```
 
-Для постоянного использования добавьте в `~/.zshrc` или `~/.bashrc`:
+For permanent use, add to `~/.zshrc` or `~/.bashrc`:
 
 ```bash
 echo 'export GEMINI_API_KEY="your-api-key"' >> ~/.zshrc
 ```
 
-### Файл конфигурации
+### Configuration File
 
-Создайте конфигурационный файл:
+Create a configuration file:
 
 ```bash
 localizerx init
 ```
 
-Конфиг создаётся в `~/.config/localizerx/config.toml`:
+Config is created at `~/.config/localizerx/config.toml`:
 
 ```toml
 [translator]
@@ -86,104 +87,174 @@ max_retries = 3
 enabled = true
 ```
 
-## Использование
+## Usage
 
-### Перевод файла
+### Quick Translation
 
 ```bash
-# Перевести на французский, испанский и немецкий
+# Translate to French, Spanish, and German (auto-detects .xcstrings files)
+localizerx --to fr,es,de
+
+# Same as above, explicit command
+localizerx translate --to fr,es,de
+```
+
+### Translate xcstrings Files
+
+```bash
+# Translate specific file
 localizerx translate Localizable.xcstrings --to fr,es,de
 
-# Указать исходный язык (по умолчанию английский)
+# Specify source language (default is English)
 localizerx translate Localizable.xcstrings --to ru --src en
 
-# Перевести все .xcstrings в директории
+# Translate all .xcstrings in a directory
 localizerx translate ./MyApp --to fr,es,de
 ```
 
-### Опции команды translate
+### Translate Options
 
-| Опция | Сокращение | Описание |
-|-------|------------|----------|
-| `--to` | `-t` | Целевые языки через запятую |
-| `--src` | `-s` | Исходный язык (по умолчанию: `en`) |
-| `--dry-run` | `-n` | Показать что будет переведено без изменений |
-| `--preview` | `-p` | Предпросмотр переводов перед применением |
-| `--overwrite` | | Перезаписать существующие переводы |
-| `--backup` | `-b` | Создать бэкап (по умолчанию: включено) |
-| `--batch-size` | | Количество строк за один API запрос (1-50) |
-| `--config` | `-c` | Путь к файлу конфигурации |
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--to` | `-t` | Target languages (comma-separated) |
+| `--src` | `-s` | Source language (default: `en`) |
+| `--dry-run` | `-n` | Show what would be translated without changes |
+| `--preview` | `-p` | Preview translations before applying |
+| `--overwrite` | | Overwrite existing translations |
+| `--no-backup` | | Don't create backup before changes |
+| `--batch-size` | | Strings per API call (1-50) |
+| `--model` | `-m` | Gemini model to use |
+| `--config` | `-c` | Path to configuration file |
 
-### Просмотр информации о файле
+### Translate App Store Metadata
+
+Translate fastlane metadata files:
 
 ```bash
-localizerx info Localizable.xcstrings
+# Translate metadata to German and French
+localizerx metadata --to de-DE,fr-FR
+
+# Specify source locale
+localizerx metadata --to ja --src en-US
+
+# Translate specific fields only
+localizerx metadata --to es-ES --fields name,subtitle,keywords
+
+# Handle character limit violations
+localizerx metadata --to de-DE --on-limit truncate
 ```
 
-Выводит статистику: количество строк, языки, покрытие переводами.
+### Metadata Options
 
-### Список поддерживаемых языков
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--to` | `-t` | Target locales (comma-separated, e.g., `de-DE,fr-FR`) |
+| `--src` | `-s` | Source locale (default: `en-US`) |
+| `--fields` | `-f` | Fields to translate (comma-separated) |
+| `--on-limit` | | Action when exceeding character limit: `warn`, `truncate`, `error` |
+| `--dry-run` | `-n` | Show what would be translated without changes |
+| `--preview` | `-p` | Preview translations before applying |
+| `--overwrite` | | Overwrite existing translations |
+| `--no-backup` | | Don't create backup before changes |
+| `--model` | `-m` | Gemini model to use |
+
+### View File Information
+
+```bash
+# xcstrings file info
+localizerx info Localizable.xcstrings
+
+# Fastlane metadata info
+localizerx metadata-info
+localizerx metadata-info ./fastlane/metadata
+```
+
+Displays statistics: string count, languages, translation coverage, character limits.
+
+### List Available Models
+
+```bash
+localizerx models
+```
+
+### List Supported Languages
 
 ```bash
 localizerx languages
 ```
 
-### Проверка версии
+### Check Version
 
 ```bash
 localizerx --version
 ```
 
-## Примеры
+## Examples
 
-### Dry run — посмотреть что будет переведено
+### Dry Run
 
 ```bash
 localizerx translate App.xcstrings --to fr,de --dry-run
 ```
 
-### Перевод с предпросмотром
+### Translation with Preview
 
 ```bash
 localizerx translate App.xcstrings --to ja --preview
 ```
 
-Покажет таблицу переводов и запросит подтверждение перед сохранением.
+Shows a table of translations and asks for confirmation before saving.
 
-### Перезапись существующих переводов
+### Overwrite Existing Translations
 
 ```bash
 localizerx translate App.xcstrings --to es --overwrite
 ```
 
-### Пакетная обработка проекта
+### Use a Specific Model
+
+```bash
+localizerx translate App.xcstrings --to ru --model gemini-2.0-flash
+```
+
+### Batch Process a Project
 
 ```bash
 localizerx translate ~/Projects/MyApp --to fr,es,de,ja,ko,zh-Hans
 ```
 
-Найдёт и переведёт все `.xcstrings` файлы в директории.
+Finds and translates all `.xcstrings` files in the directory.
 
-## Разработка
+### App Store Metadata Translation
 
 ```bash
-# Клонировать и установить зависимости
+# Translate all metadata fields
+localizerx metadata --to de-DE,fr-FR,ja
+
+# Translate only keywords with truncation if over limit
+localizerx metadata --to es-ES --fields keywords --on-limit truncate
+```
+
+## Development
+
+```bash
+# Clone and install dependencies
 git clone https://github.com/localizerx/localizerx.git
 cd localizerx
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Линтинг
+# Linting
 ruff check .
 
-# Форматирование
+# Formatting
 black .
 
-# Тесты
+# Tests
 pytest
 ```
 
-## Лицензия
+## License
 
 MIT
