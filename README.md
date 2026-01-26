@@ -78,13 +78,18 @@ localizerx init
 Config is created at `~/.config/localizerx/config.toml`:
 
 ```toml
+# Source language for translations
+source_language = "en"
+
+# Default target languages (used when --to is omitted)
+default_targets = ["ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl", "ko", "da", "sv", "ro"]
+
 [translator]
 model = "gemini-2.5-flash-lite"
 batch_size = 100
 max_retries = 3
 
-[cache]
-enabled = true
+cache_enabled = true
 ```
 
 ## Usage
@@ -92,7 +97,10 @@ enabled = true
 ### Quick Translation
 
 ```bash
-# Translate to French, Spanish, and German (auto-detects .xcstrings files)
+# Translate to all default languages (from config)
+localizerx translate
+
+# Translate to specific languages
 localizerx --to fr,es,de
 
 # Same as above, explicit command
@@ -116,7 +124,7 @@ localizerx translate ./MyApp --to fr,es,de
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--to` | `-t` | Target languages (comma-separated) |
+| `--to` | `-t` | Target languages (comma-separated). Omit to use `default_targets` from config. |
 | `--src` | `-s` | Source language (default: `en`) |
 | `--dry-run` | `-n` | Show what would be translated without changes |
 | `--preview` | `-p` | Preview translations before applying |

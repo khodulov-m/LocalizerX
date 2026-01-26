@@ -64,7 +64,7 @@ def main(
         Optional[str],
         typer.Option(
             "--to", "-t",
-            help="Target languages (comma-separated, e.g., 'fr,es,de')",
+            help="Target languages (comma-separated, e.g., 'fr,es,de'). Omit to use defaults from config.",
         ),
     ] = None,
     src: Annotated[
@@ -129,6 +129,7 @@ def main(
     """LocalizerX - Translate Xcode String Catalogs using Gemini API.
 
     Quick usage: localizerx --to ru,fr,de
+    Or use default targets: localizerx translate
     """
     # If no subcommand and --to is provided, run translate
     if ctx.invoked_subcommand is None and to is not None:
@@ -159,12 +160,12 @@ def translate(
         ),
     ] = None,
     to: Annotated[
-        str,
+        Optional[str],
         typer.Option(
             "--to", "-t",
-            help="Target languages (comma-separated, e.g., 'fr,es,de')",
+            help="Target languages (comma-separated, e.g., 'fr,es,de'). Omit to use defaults from config.",
         ),
-    ] = "",
+    ] = None,
     src: Annotated[
         str,
         typer.Option(
@@ -224,11 +225,10 @@ def translate(
         ),
     ] = None,
 ) -> None:
-    """Translate an .xcstrings file to target languages."""
-    if not to:
-        console.print("[red]Error:[/red] --to option is required (e.g., --to ru,fr,de)")
-        raise typer.Exit(1)
+    """Translate an .xcstrings file to target languages.
 
+    If --to is omitted, uses default_targets from config.
+    """
     _run_translate(
         path=path,
         to=to,
@@ -245,7 +245,7 @@ def translate(
 
 def _run_translate(
     path: Path | None,
-    to: str,
+    to: str | None,
     src: str,
     dry_run: bool,
     preview: bool,
@@ -259,10 +259,17 @@ def _run_translate(
     # Load configuration
     config = load_config(config_path)
 
-    # Parse target languages
-    target_langs = parse_language_list(to)
+    # Parse target languages (use config defaults if not specified)
+    if to:
+        target_langs = parse_language_list(to)
+    else:
+        target_langs = config.default_targets.copy()
+        if target_langs:
+            console.print(f"[dim]Using default targets from config ({len(target_langs)} languages)[/dim]")
+
     if not target_langs:
-        console.print("[red]Error:[/red] No valid target languages specified")
+        console.print("[red]Error:[/red] No target languages specified")
+        console.print("Use --to option or set default_targets in config.toml")
         raise typer.Exit(1)
 
     # Validate languages

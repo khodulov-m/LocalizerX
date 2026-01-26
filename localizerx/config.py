@@ -37,10 +37,16 @@ class TranslatorConfig(BaseModel):
     max_retries: int = Field(default=3, ge=1, le=10)
 
 
+DEFAULT_TARGET_LANGUAGES = [
+    "ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl", "ko", "da", "sv", "ro"
+]
+
+
 class Config(BaseModel):
     """Main configuration for LocalizerX."""
 
     source_language: str = "en"
+    default_targets: list[str] = Field(default_factory=lambda: DEFAULT_TARGET_LANGUAGES.copy())
     concurrency: int = Field(default=5, ge=1, le=20)
     backup_enabled: bool = True
     cache_enabled: bool = True
@@ -97,6 +103,10 @@ def create_default_config(path: Path | None = None) -> Path:
 
 # Source language for translations (default: en)
 source_language = "en"
+
+# Default target languages (used when --to is omitted)
+# Run: localizerx translate (without --to) to translate to all these languages
+default_targets = ["ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl", "ko", "da", "sv", "ro"]
 
 # Number of concurrent translation requests
 concurrency = 5

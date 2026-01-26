@@ -3,12 +3,13 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 from typer.testing import CliRunner
 
 from localizerx.cli import _find_xcstrings_files, _prompt_file_selection, app
+from localizerx.config import DEFAULT_TARGET_LANGUAGES
 
 runner = CliRunner()
 
@@ -188,11 +189,25 @@ class TestCLICommands:
         assert result.exit_code == 0
         assert "Translate Xcode String Catalogs" in result.stdout
 
-    def test_to_option_required_for_translation(self):
-        """Test that --to is required when translating."""
-        result = runner.invoke(app, ["translate"])
-        assert result.exit_code == 1
-        assert "--to option is required" in result.stdout
+    def test_translate_without_to_uses_defaults(self, temp_dir_with_xcstrings, monkeypatch):
+        """Test that translate without --to uses default targets from config."""
+        tmpdir, _ = temp_dir_with_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--dry-run"])
+        assert result.exit_code == 0
+        assert "Using default targets from config" in result.stdout
+        assert f"{len(DEFAULT_TARGET_LANGUAGES)} languages" in result.stdout
+
+    def test_translate_without_to_shows_all_default_languages(self, temp_dir_with_xcstrings, monkeypatch):
+        """Test that translate without --to shows all default languages."""
+        tmpdir, _ = temp_dir_with_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--dry-run"])
+        assert result.exit_code == 0
+        # Check some of the default languages are shown in targets
+        assert "Russian" in result.stdout or "ru" in result.stdout
+        assert "French" in result.stdout or "fr" in result.stdout
+        assert "Japanese" in result.stdout or "ja" in result.stdout
 
     def test_translate_dry_run(self, temp_dir_with_xcstrings):
         """Test translate command with --dry-run."""
@@ -314,3 +329,241 @@ class TestAutoDetection:
         monkeypatch.chdir(tmpdir)
         result = runner.invoke(app, ["--to", "fr"], input="invalid\n")
         assert "Cancelled" in result.stdout
+
+
+class TestDefaultTargets:
+    """Tests for default target languages feature."""
+
+    @pytest.fixture
+    def sample_xcstrings(self):
+        """Sample xcstrings content for testing."""
+        return {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "hello": {
+                    "localizations": {
+                        "en": {"stringUnit": {"state": "translated", "value": "Hello"}}
+                    }
+                }
+            },
+        }
+
+    @pytest.fixture
+    def temp_dir_with_xcstrings(self, sample_xcstrings):
+        """Create a temporary directory with xcstrings files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            file1 = tmpdir / "Localizable.xcstrings"
+            file1.write_text(json.dumps(sample_xcstrings))
+            yield tmpdir, [file1]
+
+    def test_translate_uses_default_targets_when_to_omitted(
+        self, temp_dir_with_xcstrings, monkeypatch
+    ):
+        """Translate command should use default targets when --to is omitted."""
+        tmpdir, _ = temp_dir_with_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--dry-run"])
+        assert result.exit_code == 0
+        assert "Using default targets from config" in result.stdout
+
+    def test_translate_explicit_to_overrides_defaults(
+        self, temp_dir_with_xcstrings, monkeypatch
+    ):
+        """Explicit --to option should override default targets."""
+        tmpdir, _ = temp_dir_with_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--to", "es", "--dry-run"])
+        assert result.exit_code == 0
+        # Should not show "Using default targets" message
+        assert "Using default targets" not in result.stdout
+        # Should show only Spanish
+        assert "Spanish" in result.stdout
+        # Should not show other default languages
+        assert "Russian" not in result.stdout
+        assert "Japanese" not in result.stdout
+
+    def test_translate_default_targets_count(
+        self, temp_dir_with_xcstrings, monkeypatch
+    ):
+        """Translate should show correct count of default languages."""
+        tmpdir, _ = temp_dir_with_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--dry-run"])
+        assert result.exit_code == 0
+        assert "14 languages" in result.stdout
+
+    def test_translate_default_targets_dry_run_shows_languages(
+        self, temp_dir_with_xcstrings, monkeypatch
+    ):
+        """Dry run with default targets should show all target languages."""
+        tmpdir, _ = temp_dir_with_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--dry-run"])
+        assert result.exit_code == 0
+        # Check output contains target language info
+        assert "Targets:" in result.stdout
+
+    def test_translate_with_explicit_path_uses_defaults(
+        self, temp_dir_with_xcstrings
+    ):
+        """Translate with explicit path should use default targets when --to omitted."""
+        tmpdir, files = temp_dir_with_xcstrings
+        result = runner.invoke(app, ["translate", str(files[0]), "--dry-run"])
+        assert result.exit_code == 0
+        assert "Using default targets from config" in result.stdout
+
+    def test_translate_with_custom_config_default_targets(
+        self, temp_dir_with_xcstrings
+    ):
+        """Translate should use custom default_targets from config file."""
+        tmpdir, files = temp_dir_with_xcstrings
+
+        # Create custom config with only 2 languages
+        config_content = '''
+source_language = "en"
+default_targets = ["fr", "de"]
+
+[translator]
+model = "gemini-2.5-flash-lite"
+'''
+        config_path = tmpdir / "config.toml"
+        config_path.write_text(config_content)
+
+        result = runner.invoke(
+            app,
+            ["translate", str(files[0]), "--config", str(config_path), "--dry-run"]
+        )
+        assert result.exit_code == 0
+        assert "Using default targets from config (2 languages)" in result.stdout
+        assert "French" in result.stdout
+        assert "German" in result.stdout
+        # Should not have other languages
+        assert "Russian" not in result.stdout
+
+    def test_translate_with_empty_config_default_targets(
+        self, temp_dir_with_xcstrings
+    ):
+        """Translate should show error when config has empty default_targets."""
+        tmpdir, files = temp_dir_with_xcstrings
+
+        # Create config with empty default_targets
+        config_content = '''
+source_language = "en"
+default_targets = []
+
+[translator]
+model = "gemini-2.5-flash-lite"
+'''
+        config_path = tmpdir / "config.toml"
+        config_path.write_text(config_content)
+
+        result = runner.invoke(
+            app,
+            ["translate", str(files[0]), "--config", str(config_path)]
+        )
+        assert result.exit_code == 1
+        assert "No target languages specified" in result.stdout
+
+    def test_main_callback_without_to_shows_help(self):
+        """Main callback without --to should show help (not use defaults)."""
+        result = runner.invoke(app, [])
+        assert result.exit_code == 0
+        # Should show help, not start translation
+        assert "Translate Xcode String Catalogs" in result.stdout
+
+    def test_translate_subcommand_help_shows_default_info(self):
+        """Translate subcommand help should mention default targets."""
+        result = runner.invoke(app, ["translate", "--help"])
+        assert result.exit_code == 0
+        assert "default" in result.stdout.lower()
+
+    def test_translate_default_targets_includes_all_expected_languages(
+        self, temp_dir_with_xcstrings, monkeypatch
+    ):
+        """Translate should include all expected default languages."""
+        tmpdir, _ = temp_dir_with_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--dry-run"])
+        assert result.exit_code == 0
+
+        # Check that the output mentions various expected languages
+        # (checking both language names and codes)
+        expected_indicators = [
+            ("ru", "Russian"),
+            ("fr", "French"),
+            ("pt-BR", "Portuguese"),
+            ("es-MX", "Spanish"),
+            ("it", "Italian"),
+            ("ja", "Japanese"),
+            ("pl", "Polish"),
+            ("no", "Norwegian"),
+            ("de-DE", "German"),
+            ("nl", "Dutch"),
+            ("ko", "Korean"),
+            ("da", "Danish"),
+            ("sv", "Swedish"),
+            ("ro", "Romanian"),
+        ]
+
+        output = result.stdout
+        for code, name in expected_indicators:
+            assert code in output or name in output, f"Expected {code} or {name} in output"
+
+
+class TestDefaultTargetsWithMultipleFiles:
+    """Tests for default targets with multiple xcstrings files."""
+
+    @pytest.fixture
+    def sample_xcstrings(self):
+        """Sample xcstrings content for testing."""
+        return {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "hello": {
+                    "localizations": {
+                        "en": {"stringUnit": {"state": "translated", "value": "Hello"}}
+                    }
+                }
+            },
+        }
+
+    @pytest.fixture
+    def temp_dir_with_multiple_xcstrings(self, sample_xcstrings):
+        """Create a temporary directory with multiple xcstrings files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            (tmpdir / "App").mkdir()
+            (tmpdir / "Widgets").mkdir()
+
+            file1 = tmpdir / "App" / "Localizable.xcstrings"
+            file2 = tmpdir / "Widgets" / "Localizable.xcstrings"
+
+            file1.write_text(json.dumps(sample_xcstrings))
+            file2.write_text(json.dumps(sample_xcstrings))
+
+            yield tmpdir, sorted([file1, file2])
+
+    def test_translate_multiple_files_uses_defaults(
+        self, temp_dir_with_multiple_xcstrings, monkeypatch
+    ):
+        """Translate multiple files should use default targets."""
+        tmpdir, _ = temp_dir_with_multiple_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--dry-run"], input="a\n")
+        assert result.exit_code == 0
+        assert "Using default targets from config" in result.stdout
+        assert "Found 2 .xcstrings file(s)" in result.stdout
+
+    def test_translate_select_one_file_uses_defaults(
+        self, temp_dir_with_multiple_xcstrings, monkeypatch
+    ):
+        """Select one file from multiple should use default targets."""
+        tmpdir, _ = temp_dir_with_multiple_xcstrings
+        monkeypatch.chdir(tmpdir)
+        result = runner.invoke(app, ["translate", "--dry-run"], input="1\n")
+        assert result.exit_code == 0
+        assert "Using default targets from config" in result.stdout
+        assert "Found 1 .xcstrings file(s)" in result.stdout
