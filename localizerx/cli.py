@@ -31,8 +31,11 @@ from localizerx.parser.model import Translation
 from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
 from localizerx.utils.locale import (
+    get_fastlane_locale_name,
     get_language_name,
+    parse_fastlane_locale_list,
     parse_language_list,
+    validate_fastlane_locale,
     validate_language_code,
 )
 
@@ -656,6 +659,520 @@ def info(
         console.print(table)
     else:
         console.print("\n[yellow]No translations found[/yellow]")
+
+
+@app.command()
+def metadata(
+    path: Annotated[
+        Optional[Path],
+        typer.Argument(
+            help="Path to fastlane metadata directory (auto-detected if omitted)",
+        ),
+    ] = None,
+    to: Annotated[
+        str,
+        typer.Option(
+            "--to", "-t",
+            help="Target locales (comma-separated, e.g., 'de-DE,fr-FR,es-ES')",
+        ),
+    ] = "",
+    src: Annotated[
+        str,
+        typer.Option(
+            "--src", "-s",
+            help="Source locale",
+        ),
+    ] = "en-US",
+    fields: Annotated[
+        Optional[str],
+        typer.Option(
+            "--fields", "-f",
+            help="Fields to translate (comma-separated: name,subtitle,keywords,etc.)",
+        ),
+    ] = None,
+    on_limit: Annotated[
+        str,
+        typer.Option(
+            "--on-limit",
+            help="Action when translation exceeds character limit: warn, truncate, or error",
+        ),
+    ] = "warn",
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", "-n",
+            help="Show what would be translated without making changes",
+        ),
+    ] = False,
+    preview: Annotated[
+        bool,
+        typer.Option(
+            "--preview", "-p",
+            help="Show proposed translations before applying",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Overwrite existing translations",
+        ),
+    ] = False,
+    no_backup: Annotated[
+        bool,
+        typer.Option(
+            "--no-backup",
+            help="Don't create backup before writing changes",
+        ),
+    ] = False,
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model", "-m",
+            help="Gemini model to use (see 'localizerx models' for list)",
+        ),
+    ] = None,
+) -> None:
+    """Translate fastlane App Store metadata to target locales."""
+    if not to:
+        console.print("[red]Error:[/red] --to option is required (e.g., --to de-DE,fr-FR)")
+        raise typer.Exit(1)
+
+    # Validate on_limit option
+    from localizerx.utils.limits import LimitAction
+    try:
+        limit_action = LimitAction(on_limit)
+    except ValueError:
+        console.print(f"[red]Error:[/red] Invalid --on-limit value: {on_limit}")
+        console.print("Valid options: warn, truncate, error")
+        raise typer.Exit(1)
+
+    _run_metadata_translate(
+        path=path,
+        to=to,
+        src=src,
+        fields=fields,
+        limit_action=limit_action,
+        dry_run=dry_run,
+        preview=preview,
+        overwrite=overwrite,
+        backup=not no_backup,
+        model=model,
+    )
+
+
+@app.command("metadata-info")
+def metadata_info(
+    path: Annotated[
+        Optional[Path],
+        typer.Argument(
+            help="Path to fastlane metadata directory (auto-detected if omitted)",
+        ),
+    ] = None,
+) -> None:
+    """Show information about fastlane metadata files."""
+    from localizerx.io.metadata import detect_metadata_path, read_metadata
+    from localizerx.parser.metadata_model import FIELD_LIMITS, MetadataFieldType
+
+    # Find metadata path
+    if path is None:
+        path = detect_metadata_path()
+        if path is None:
+            console.print("[red]Error:[/red] No metadata directory found")
+            console.print("Run from a directory with fastlane/metadata or specify path")
+            raise typer.Exit(1)
+
+    if not path.exists():
+        console.print(f"[red]Error:[/red] Path does not exist: {path}")
+        raise typer.Exit(1)
+
+    # Read metadata
+    try:
+        catalog = read_metadata(path)
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Metadata Directory:[/bold] {path}")
+    console.print(f"[bold]Source Locale:[/bold] {catalog.source_locale}")
+    console.print(f"[bold]Total Locales:[/bold] {catalog.locale_count}")
+    console.print()
+
+    # Show locale table
+    table = Table(title="Locale Status")
+    table.add_column("Locale", style="cyan")
+    table.add_column("Name", style="white")
+    table.add_column("Fields", style="green")
+    table.add_column("Issues", style="yellow")
+
+    for locale, locale_meta in sorted(catalog.locales.items()):
+        locale_name = get_fastlane_locale_name(locale)
+        field_count = locale_meta.field_count
+        over_limit = locale_meta.get_over_limit_fields()
+
+        issues = []
+        if over_limit:
+            issues.append(f"{len(over_limit)} over limit")
+
+        issues_str = ", ".join(issues) if issues else "-"
+        is_source = " (source)" if locale == catalog.source_locale else ""
+
+        table.add_row(
+            f"{locale}{is_source}",
+            locale_name,
+            str(field_count),
+            issues_str,
+        )
+
+    console.print(table)
+    console.print()
+
+    # Show field details for source locale
+    source = catalog.get_source_metadata()
+    if source:
+        console.print(f"[bold]Source Fields ({catalog.source_locale}):[/bold]")
+        field_table = Table()
+        field_table.add_column("Field", style="cyan")
+        field_table.add_column("Chars", style="white")
+        field_table.add_column("Limit", style="yellow")
+        field_table.add_column("Status", style="green")
+
+        for field_type in MetadataFieldType:
+            field = source.get_field(field_type)
+            if field:
+                char_count = field.char_count
+                limit = field.limit
+                if field.is_over_limit:
+                    status = f"[red]OVER by {field.chars_over}[/red]"
+                else:
+                    status = "OK"
+                field_table.add_row(
+                    field_type.value,
+                    str(char_count),
+                    str(limit),
+                    status,
+                )
+            else:
+                field_table.add_row(
+                    field_type.value,
+                    "-",
+                    str(FIELD_LIMITS[field_type]),
+                    "[dim]missing[/dim]",
+                )
+
+        console.print(field_table)
+
+
+def _run_metadata_translate(
+    path: Path | None,
+    to: str,
+    src: str,
+    fields: str | None,
+    limit_action,
+    dry_run: bool,
+    preview: bool,
+    overwrite: bool,
+    backup: bool,
+    model: str | None,
+) -> None:
+    """Core metadata translation logic."""
+    from localizerx.io.metadata import detect_metadata_path, read_metadata
+    from localizerx.parser.metadata_model import MetadataFieldType
+
+    # Load configuration
+    config = load_config()
+
+    # Parse target locales
+    target_locales = parse_fastlane_locale_list(to)
+    if not target_locales:
+        console.print("[red]Error:[/red] No valid target locales specified")
+        raise typer.Exit(1)
+
+    # Validate locales
+    invalid_locales = [loc for loc in target_locales if not validate_fastlane_locale(loc)]
+    if invalid_locales:
+        codes = ", ".join(invalid_locales)
+        console.print(f"[yellow]Warning:[/yellow] Unrecognized locale codes: {codes}")
+
+    # Parse fields filter
+    field_types: list[MetadataFieldType] | None = None
+    if fields:
+        field_types = []
+        for field_name in fields.split(","):
+            field_name = field_name.strip().lower()
+            try:
+                field_types.append(MetadataFieldType(field_name))
+            except ValueError:
+                console.print(f"[yellow]Warning:[/yellow] Unknown field: {field_name}")
+        if not field_types:
+            console.print("[red]Error:[/red] No valid fields specified")
+            raise typer.Exit(1)
+
+    # Find metadata path
+    if path is None:
+        path = detect_metadata_path()
+        if path is None:
+            console.print("[red]Error:[/red] No metadata directory found")
+            console.print("Run from a directory with fastlane/metadata or specify path")
+            raise typer.Exit(1)
+
+    if not path.exists():
+        console.print(f"[red]Error:[/red] Path does not exist: {path}")
+        raise typer.Exit(1)
+
+    # Read metadata
+    try:
+        catalog = read_metadata(path, source_locale=src)
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Check source locale exists
+    source = catalog.get_source_metadata()
+    if not source:
+        console.print(f"[red]Error:[/red] Source locale '{src}' not found in metadata")
+        console.print(f"Available locales: {', '.join(catalog.locales.keys())}")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Metadata Directory:[/bold] {path}")
+    console.print(f"[bold]Source:[/bold] {get_fastlane_locale_name(src)} ({src})")
+    target_display = ", ".join(f"{get_fastlane_locale_name(loc)} ({loc})" for loc in target_locales)
+    console.print(f"[bold]Targets:[/bold] {target_display}")
+    console.print()
+
+    # Determine fields to translate for each locale
+    translation_tasks: dict[str, list[MetadataFieldType]] = {}
+
+    for target_locale in target_locales:
+        # Get fields needing translation
+        needs = catalog.get_fields_needing_translation(target_locale, field_types)
+
+        # If overwrite, translate all specified fields that exist in source
+        if overwrite:
+            if field_types:
+                needs = [ft for ft in field_types if source.has_field(ft)]
+            else:
+                needs = [ft for ft in MetadataFieldType if source.has_field(ft)]
+
+        if needs:
+            translation_tasks[target_locale] = needs
+
+    if not translation_tasks:
+        console.print("[green]All fields already translated[/green]")
+        return
+
+    # Show summary
+    for locale, locale_fields in translation_tasks.items():
+        field_names = ", ".join(f.value for f in locale_fields)
+        console.print(f"  {get_fastlane_locale_name(locale)}: {field_names}")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run - no changes made[/yellow]")
+        _show_metadata_dry_run(catalog, translation_tasks)
+        return
+
+    # Perform translation
+    asyncio.run(
+        _translate_metadata(
+            catalog=catalog,
+            path=path,
+            source_locale=src,
+            translation_tasks=translation_tasks,
+            config=config,
+            limit_action=limit_action,
+            preview=preview,
+            backup=backup,
+            model=model,
+        )
+    )
+
+
+def _show_metadata_dry_run(
+    catalog,
+    tasks: dict[str, list],
+) -> None:
+    """Show table of fields that would be translated."""
+    from localizerx.parser.metadata_model import FIELD_LIMITS
+
+    source = catalog.get_source_metadata()
+    if not source:
+        return
+
+    table = Table(title="Fields to Translate")
+    table.add_column("Locale", style="cyan")
+    table.add_column("Field", style="white")
+    table.add_column("Source Length", style="yellow")
+    table.add_column("Limit", style="green")
+
+    for locale, fields in tasks.items():
+        for field_type in fields:
+            field = source.get_field(field_type)
+            if field:
+                table.add_row(
+                    locale,
+                    field_type.value,
+                    str(field.char_count),
+                    str(FIELD_LIMITS[field_type]),
+                )
+
+    console.print(table)
+
+
+async def _translate_metadata(
+    catalog,
+    path: Path,
+    source_locale: str,
+    translation_tasks: dict[str, list],
+    config,
+    limit_action,
+    preview: bool,
+    backup: bool,
+    model: str | None,
+) -> None:
+    """Perform metadata translations and update files."""
+    from localizerx.io.metadata import write_metadata
+    from localizerx.parser.metadata_model import MetadataFieldType
+    from localizerx.translator.metadata_prompts import (
+        build_keywords_prompt,
+        build_metadata_prompt,
+    )
+    from localizerx.utils.limits import LimitAction, truncate_to_limit, validate_limit
+
+    cache_dir = get_cache_dir(config)
+    actual_model = model or config.translator.model
+
+    source = catalog.get_source_metadata()
+    if not source:
+        return
+
+    async with GeminiTranslator(
+        model=actual_model,
+        batch_size=1,  # Metadata fields are translated one at a time
+        max_retries=config.translator.max_retries,
+        cache_dir=cache_dir,
+    ) as translator:
+        all_translations: dict[str, dict[MetadataFieldType, str]] = {}
+        limit_warnings: list[str] = []
+
+        for target_locale, field_types in translation_tasks.items():
+            console.print(f"  Translating to {get_fastlane_locale_name(target_locale)}...")
+
+            all_translations[target_locale] = {}
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task(f"    {target_locale}", total=len(field_types))
+
+                for field_type in field_types:
+                    field = source.get_field(field_type)
+                    if not field:
+                        progress.advance(task)
+                        continue
+
+                    # Build specialized prompt
+                    if field_type == MetadataFieldType.KEYWORDS:
+                        prompt = build_keywords_prompt(
+                            field.content, source_locale, target_locale
+                        )
+                    else:
+                        prompt = build_metadata_prompt(
+                            field.content, field_type, source_locale, target_locale
+                        )
+
+                    # Translate using raw API call via the translator's internal method
+                    try:
+                        translated = await translator._call_api(prompt)
+                        translated = translated.strip()
+                    except Exception as e:
+                        console.print(f"    [red]Error translating {field_type.value}: {e}[/red]")
+                        progress.advance(task)
+                        continue
+
+                    # Validate against limit
+                    validation = validate_limit(translated, field_type)
+
+                    if not validation.is_valid:
+                        warning = (
+                            f"[{target_locale}] {field_type.value}: "
+                            f"{validation.char_count}/{validation.limit} chars "
+                            f"(over by {validation.chars_over})"
+                        )
+                        limit_warnings.append(warning)
+
+                        if limit_action == LimitAction.ERROR:
+                            console.print(f"    [red]Error: {warning}[/red]")
+                            raise typer.Exit(1)
+                        elif limit_action == LimitAction.TRUNCATE:
+                            translated = truncate_to_limit(translated, field_type)
+                            console.print(f"    [yellow]Truncated: {field_type.value}[/yellow]")
+                        else:  # warn
+                            console.print(f"    [yellow]Warning: {warning}[/yellow]")
+
+                    all_translations[target_locale][field_type] = translated
+                    progress.advance(task)
+
+        # Show preview if requested
+        if preview:
+            _show_metadata_preview(source, all_translations)
+            if not typer.confirm("Apply these translations?"):
+                console.print("  [yellow]Cancelled[/yellow]")
+                return
+
+        # Update catalog and write files
+        for target_locale, translations in all_translations.items():
+            locale_meta = catalog.get_or_create_locale(target_locale)
+            for field_type, value in translations.items():
+                locale_meta.set_field(field_type, value)
+
+        # Write only the translated locales
+        write_metadata(
+            catalog,
+            path,
+            backup=backup,
+            locales=list(all_translations.keys()),
+        )
+
+        console.print(f"\n[green]Saved translations to {path}[/green]")
+
+        # Show limit warnings summary
+        if limit_warnings:
+            console.print(f"\n[yellow]Character limit warnings ({len(limit_warnings)}):[/yellow]")
+            for warning in limit_warnings[:10]:
+                console.print(f"  {warning}")
+            if len(limit_warnings) > 10:
+                console.print(f"  ... and {len(limit_warnings) - 10} more")
+
+
+def _show_metadata_preview(source, all_translations: dict) -> None:
+    """Show preview of metadata translations."""
+    table = Table(title="Translation Preview")
+    table.add_column("Locale", style="cyan")
+    table.add_column("Field", style="white")
+    table.add_column("Translation", style="green")
+    table.add_column("Chars", style="yellow")
+
+    count = 0
+    for locale, translations in all_translations.items():
+        for field_type, value in translations.items():
+            preview_value = value[:60] + "..." if len(value) > 60 else value
+            preview_value = preview_value.replace("\n", " ")
+            table.add_row(locale, field_type.value, preview_value, str(len(value)))
+            count += 1
+            if count >= 20:
+                break
+        if count >= 20:
+            break
+
+    total = sum(len(t) for t in all_translations.values())
+    if total > 20:
+        table.add_row("...", "", f"({total - 20} more)", "")
+
+    console.print(table)
 
 
 if __name__ == "__main__":

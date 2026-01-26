@@ -1,0 +1,1 @@
+localization,translation,xcode,ios,app store,metadata,fastlane,strings

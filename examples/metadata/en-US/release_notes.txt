@@ -1,0 +1,11 @@
+What's New in v1.1.0:
+
+- Added App Store metadata translation support
+- Translate fastlane/metadata files with a single command
+- Character limit validation for all App Store fields
+- Choose how to handle limit violations: warn, truncate, or error
+- New metadata-info command to view translation status
+
+Bug Fixes:
+- Fixed placeholder preservation in long strings
+- Improved handling of special characters

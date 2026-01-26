@@ -1,0 +1,17 @@
+LocalizerX is a powerful CLI tool for translating your iOS and macOS app metadata for the App Store.
+
+Features:
+- Translate Xcode String Catalogs (.xcstrings files)
+- Translate fastlane metadata (name, subtitle, description, keywords, etc.)
+- Powered by Google's Gemini AI for accurate translations
+- Preserve placeholders and formatting
+- Character limit validation for App Store fields
+- Support for all App Store Connect languages
+
+Getting started is easy:
+1. Set your GEMINI_API_KEY environment variable
+2. Run: localizerx metadata --to de-DE,fr-FR,ja
+
+LocalizerX respects App Store character limits and warns you when translations exceed them. You can choose to auto-truncate, show warnings, or stop on limit errors.
+
+Perfect for indie developers and teams who want to localize their apps without manual translation work.
