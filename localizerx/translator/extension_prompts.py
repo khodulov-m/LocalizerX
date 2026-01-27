@@ -79,6 +79,17 @@ def _get_extension_field_context(field_type: ExtensionFieldType) -> str:
             "Should clearly communicate the extension's value proposition "
             "and key features in a single compelling sentence."
         ),
+        ExtensionFieldType.SHORT_DESC: (
+            "A short description shown on the Chrome Web Store listing. "
+            "Should clearly communicate the extension's value proposition "
+            "and key features in a concise, compelling way."
+        ),
+        ExtensionFieldType.STORE_DESC: (
+            "The full detailed description shown on the Chrome Web Store listing page. "
+            "This is the main marketing text that describes all features, benefits, "
+            "and use cases of the extension. Preserve all markdown formatting, "
+            "section headers, bullet points, emojis, and structure."
+        ),
     }
     return contexts.get(field_type, "Chrome Web Store metadata field")
 
@@ -100,6 +111,18 @@ def _get_extension_field_rules(field_type: ExtensionFieldType) -> str:
             "5. Write a compelling, SEO-friendly description\n"
             "6. Include relevant keywords naturally\n"
             "7. Maintain the same information density as the original"
+        ),
+        ExtensionFieldType.SHORT_DESC: (
+            "5. Write a compelling, SEO-friendly description\n"
+            "6. Include relevant keywords naturally\n"
+            "7. Maintain the same information density as the original"
+        ),
+        ExtensionFieldType.STORE_DESC: (
+            "5. Preserve ALL markdown formatting (headers, bullets, numbered lists)\n"
+            "6. Keep all emojis in their original positions\n"
+            "7. Maintain the same section structure and layout\n"
+            "8. Translate SEO keywords naturally for the target language\n"
+            "9. Return the COMPLETE translated text - do not truncate or summarize"
         ),
     }
     return rules.get(field_type, "")

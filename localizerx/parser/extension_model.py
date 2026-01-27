@@ -14,6 +14,8 @@ class ExtensionFieldType(str, Enum):
     APP_NAME = "appName"
     SHORT_NAME = "shortName"
     DESCRIPTION = "appDesc"
+    SHORT_DESC = "shortDesc"
+    STORE_DESC = "storeDesc"
 
 
 # Chrome Web Store character limits
@@ -21,6 +23,8 @@ EXTENSION_FIELD_LIMITS: dict[ExtensionFieldType, int] = {
     ExtensionFieldType.APP_NAME: 75,
     ExtensionFieldType.SHORT_NAME: 12,
     ExtensionFieldType.DESCRIPTION: 132,
+    ExtensionFieldType.SHORT_DESC: 132,
+    ExtensionFieldType.STORE_DESC: 16383,
 }
 
 # Known CWS message keys for special handling

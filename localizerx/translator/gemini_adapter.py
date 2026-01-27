@@ -265,27 +265,45 @@ Texts to translate:
 Translations (numbered to match, one per line):"""
 
     def _parse_batch_response(self, response: str, expected_count: int) -> list[str]:
-        """Parse batch translation response."""
+        """Parse batch translation response.
+
+        Handles multi-line translations by grouping lines between numbered items.
+        E.g. "1. first line\\nsecond line\\n2. another" -> ["first line\\nsecond line", "another"]
+        """
+        import re
+
         lines = response.strip().split("\n")
-        results = []
+        results: list[list[str]] = []
+        current_lines: list[str] = []
 
         for line in lines:
-            line = line.strip()
-            if not line:
-                continue
+            # Check if this line starts a new numbered item
+            match = re.match(r"^\d+[\.\)\:]\s*(.*)", line)
+            if match:
+                # Save previous item if any
+                if current_lines:
+                    results.append(current_lines)
+                current_lines = [match.group(1)] if match.group(1) else []
+            else:
+                # Continuation of current item (or leading text before first number)
+                if results or current_lines:
+                    current_lines.append(line)
+                elif line.strip():
+                    # Text before any numbering — treat as first item
+                    current_lines.append(line)
 
-            # Remove numbering patterns like "1.", "1)", "1:"
-            import re
+        # Don't forget the last item
+        if current_lines:
+            results.append(current_lines)
 
-            cleaned = re.sub(r"^\d+[\.\)\:]\s*", "", line)
-            if cleaned:
-                results.append(cleaned)
+        # Join multi-line items back together
+        joined = ["\n".join(lines_group) for lines_group in results]
 
         # Pad with empty strings if we got fewer results
-        while len(results) < expected_count:
-            results.append("")
+        while len(joined) < expected_count:
+            joined.append("")
 
-        return results[:expected_count]
+        return joined[:expected_count]
 
     async def _call_api(self, prompt: str) -> str:
         """Call Gemini API with retry logic."""
@@ -296,7 +314,7 @@ Translations (numbered to match, one per line):"""
             "generationConfig": {
                 "temperature": 0.3,
                 "topP": 0.8,
-                "maxOutputTokens": 2048,
+                "maxOutputTokens": 8192,
             },
         }
 
