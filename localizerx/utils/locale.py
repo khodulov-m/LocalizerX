@@ -315,3 +315,134 @@ def parse_fastlane_locale_list(value: str) -> list[str]:
     """
     codes = [c.strip() for c in value.split(",")]
     return [c for c in codes if c]
+
+
+# Chrome Extension locale codes (underscore notation) and their display names
+# See https://developer.chrome.com/docs/extensions/reference/api/i18n
+CHROME_LOCALES: dict[str, str] = {
+    "ar": "Arabic",
+    "am": "Amharic",
+    "bg": "Bulgarian",
+    "bn": "Bengali",
+    "ca": "Catalan",
+    "cs": "Czech",
+    "da": "Danish",
+    "de": "German",
+    "el": "Greek",
+    "en": "English",
+    "en_AU": "English (Australia)",
+    "en_GB": "English (UK)",
+    "en_US": "English (US)",
+    "es": "Spanish",
+    "es_419": "Spanish (Latin America)",
+    "et": "Estonian",
+    "fa": "Persian",
+    "fi": "Finnish",
+    "fil": "Filipino",
+    "fr": "French",
+    "gu": "Gujarati",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "hr": "Croatian",
+    "hu": "Hungarian",
+    "id": "Indonesian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "kn": "Kannada",
+    "ko": "Korean",
+    "lt": "Lithuanian",
+    "lv": "Latvian",
+    "ml": "Malayalam",
+    "mr": "Marathi",
+    "ms": "Malay",
+    "nl": "Dutch",
+    "no": "Norwegian",
+    "pl": "Polish",
+    "pt_BR": "Portuguese (Brazil)",
+    "pt_PT": "Portuguese (Portugal)",
+    "ro": "Romanian",
+    "ru": "Russian",
+    "sk": "Slovak",
+    "sl": "Slovenian",
+    "sr": "Serbian",
+    "sv": "Swedish",
+    "sw": "Swahili",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "th": "Thai",
+    "tr": "Turkish",
+    "uk": "Ukrainian",
+    "vi": "Vietnamese",
+    "zh_CN": "Chinese (Simplified)",
+    "zh_TW": "Chinese (Traditional)",
+}
+
+
+def validate_chrome_locale(code: str) -> bool:
+    """
+    Check if a locale code is valid for Chrome Extensions.
+
+    Accepts underscore notation (pt_BR) as used by Chrome.
+
+    Examples:
+        >>> validate_chrome_locale("en")
+        True
+        >>> validate_chrome_locale("pt_BR")
+        True
+        >>> validate_chrome_locale("invalid")
+        False
+    """
+    return code in CHROME_LOCALES
+
+
+def get_chrome_locale_name(code: str) -> str:
+    """
+    Get the display name for a Chrome locale code.
+
+    Returns the code itself if no name is found.
+    """
+    if code in CHROME_LOCALES:
+        return CHROME_LOCALES[code]
+    return get_language_name(chrome_to_standard_locale(code))
+
+
+def parse_chrome_locale_list(value: str) -> list[str]:
+    """
+    Parse a comma-separated list of Chrome locale codes.
+
+    Accepts hyphens and auto-converts to Chrome underscore format.
+
+    Examples:
+        >>> parse_chrome_locale_list("fr,pt-BR,zh-CN")
+        ['fr', 'pt_BR', 'zh_CN']
+        >>> parse_chrome_locale_list("de, es, ja")
+        ['de', 'es', 'ja']
+    """
+    codes = [standard_to_chrome_locale(c.strip()) for c in value.split(",")]
+    return [c for c in codes if c]
+
+
+def chrome_to_standard_locale(code: str) -> str:
+    """
+    Convert Chrome underscore locale to standard hyphen format.
+
+    Examples:
+        >>> chrome_to_standard_locale("pt_BR")
+        'pt-BR'
+        >>> chrome_to_standard_locale("en")
+        'en'
+    """
+    return code.replace("_", "-")
+
+
+def standard_to_chrome_locale(code: str) -> str:
+    """
+    Convert standard hyphen locale to Chrome underscore format.
+
+    Examples:
+        >>> standard_to_chrome_locale("pt-BR")
+        'pt_BR'
+        >>> standard_to_chrome_locale("en")
+        'en'
+    """
+    return code.replace("-", "_")

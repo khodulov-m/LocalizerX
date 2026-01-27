@@ -1,11 +1,16 @@
-"""Character limit validation utilities for App Store metadata."""
+"""Character limit validation utilities for App Store and Chrome Web Store metadata."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Union
 
+from localizerx.parser.extension_model import EXTENSION_FIELD_LIMITS, ExtensionFieldType
 from localizerx.parser.metadata_model import FIELD_LIMITS, MetadataFieldType
+
+# Union type for all field types with limits
+FieldType = Union[MetadataFieldType, ExtensionFieldType]
 
 
 class LimitAction(str, Enum):
@@ -16,11 +21,18 @@ class LimitAction(str, Enum):
     ERROR = "error"  # Stop on limit exceeded
 
 
+def _get_limit(field_type: FieldType) -> int:
+    """Get the character limit for a field type."""
+    if isinstance(field_type, MetadataFieldType):
+        return FIELD_LIMITS[field_type]
+    return EXTENSION_FIELD_LIMITS[field_type]
+
+
 @dataclass
 class LimitValidationResult:
     """Result of validating a field against its character limit."""
 
-    field_type: MetadataFieldType
+    field_type: FieldType
     content: str
     char_count: int
     limit: int
@@ -38,18 +50,18 @@ class LimitValidationResult:
         )
 
 
-def validate_limit(content: str, field_type: MetadataFieldType) -> LimitValidationResult:
+def validate_limit(content: str, field_type: FieldType) -> LimitValidationResult:
     """
     Validate content against the character limit for a field type.
 
     Args:
         content: The text content to validate
-        field_type: The metadata field type
+        field_type: The metadata or extension field type
 
     Returns:
         LimitValidationResult with validation details
     """
-    limit = FIELD_LIMITS[field_type]
+    limit = _get_limit(field_type)
     char_count = len(content)
     chars_over = max(0, char_count - limit)
     is_valid = char_count <= limit
@@ -64,7 +76,7 @@ def validate_limit(content: str, field_type: MetadataFieldType) -> LimitValidati
     )
 
 
-def truncate_to_limit(content: str, field_type: MetadataFieldType) -> str:
+def truncate_to_limit(content: str, field_type: FieldType) -> str:
     """
     Truncate content to fit within the character limit for a field type.
 
@@ -73,17 +85,17 @@ def truncate_to_limit(content: str, field_type: MetadataFieldType) -> str:
 
     Args:
         content: The text content to truncate
-        field_type: The metadata field type
+        field_type: The metadata or extension field type
 
     Returns:
         Truncated content that fits within the limit
     """
-    limit = FIELD_LIMITS[field_type]
+    limit = _get_limit(field_type)
 
     if len(content) <= limit:
         return content
 
-    if field_type == MetadataFieldType.KEYWORDS:
+    if isinstance(field_type, MetadataFieldType) and field_type == MetadataFieldType.KEYWORDS:
         return _truncate_keywords(content, limit)
 
     return content[:limit]
@@ -114,17 +126,17 @@ def _truncate_keywords(content: str, limit: int) -> str:
     return truncated.strip()
 
 
-def get_limit_for_field(field_type: MetadataFieldType) -> int:
+def get_limit_for_field(field_type: FieldType) -> int:
     """
     Get the character limit for a field type.
 
     Args:
-        field_type: The metadata field type
+        field_type: The metadata or extension field type
 
     Returns:
         Character limit
     """
-    return FIELD_LIMITS[field_type]
+    return _get_limit(field_type)
 
 
 def format_limit_warning(result: LimitValidationResult, locale: str) -> str:

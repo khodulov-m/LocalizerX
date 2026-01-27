@@ -31,8 +31,18 @@ PRINTF_PATTERNS = [
 # Named placeholder patterns: {name}, {count}, etc.
 NAMED_PLACEHOLDER_PATTERN = r"\{[a-zA-Z_][a-zA-Z0-9_]*\}"
 
+# Chrome Extension placeholder patterns
+# $PLACEHOLDER_NAME$ syntax (e.g., $APP_NAME$, $userName$)
+CHROME_NAMED_PLACEHOLDER_PATTERN = r"\$[a-zA-Z_][a-zA-Z0-9_]*\$"
+# $1-style positional placeholders (e.g., $1, $2)
+CHROME_POSITIONAL_PLACEHOLDER_PATTERN = r"\$\d+"
+
 # Combine all patterns
-ALL_PATTERNS = PRINTF_PATTERNS + [NAMED_PLACEHOLDER_PATTERN]
+ALL_PATTERNS = PRINTF_PATTERNS + [
+    NAMED_PLACEHOLDER_PATTERN,
+    CHROME_NAMED_PLACEHOLDER_PATTERN,
+    CHROME_POSITIONAL_PLACEHOLDER_PATTERN,
+]
 COMBINED_PATTERN = re.compile("|".join(f"({p})" for p in ALL_PATTERNS))
 
 

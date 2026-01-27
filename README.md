@@ -6,7 +6,8 @@ CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`) and A
 
 - Translate `.xcstrings` files to multiple languages with a single command
 - Translate fastlane App Store metadata (name, subtitle, description, keywords, etc.)
-- Preserve placeholders (`%@`, `%d`, `{name}`) during translation
+- Translate Chrome Extension `_locales/` message files with SEO-optimized prompts
+- Preserve placeholders (`%@`, `%d`, `{name}`, `$PLACEHOLDER$`, `$1`) during translation
 - Support for pluralization and declension forms
 - Use developer comments for translation context
 - SQLite caching to reduce API calls
@@ -166,6 +167,54 @@ localizerx metadata --to de-DE --on-limit truncate
 | `--no-backup` | | Don't create backup before changes |
 | `--model` | `-m` | Gemini model to use |
 
+### Translate Chrome Extension Messages
+
+Translate Chrome Extension `_locales/` message files:
+
+```bash
+# Translate messages to French and German
+localizerx chrome --to fr,de
+
+# Translate specific message keys only
+localizerx chrome --to ja --keys appName,appDesc,shortName
+
+# Handle character limit violations for Chrome Web Store fields
+localizerx chrome --to pt-BR --on-limit truncate
+
+# Accept hyphenated locales (auto-converted to underscore format)
+localizerx chrome --to pt-BR,zh-CN  # Creates pt_BR/ and zh_CN/
+```
+
+### Chrome Extension Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--to` | `-t` | Target locales (comma-separated, e.g., `fr,de,pt-BR`). Hyphens auto-converted to underscores. |
+| `--src` | `-s` | Source locale (default: `en`) |
+| `--keys` | `-k` | Filter specific message keys (comma-separated) |
+| `--on-limit` | | Action when CWS field exceeds character limit: `warn`, `truncate`, `error` |
+| `--dry-run` | `-n` | Show what would be translated without changes |
+| `--preview` | `-p` | Preview translations before applying |
+| `--overwrite` | | Overwrite existing translations |
+| `--no-backup` | | Don't create backup before changes |
+| `--model` | `-m` | Gemini model to use |
+
+**Key Features:**
+- SEO-optimized prompts for Chrome Web Store fields (`appName`, `shortName`, `appDesc`)
+- Character limit enforcement: `appName` (75 chars), `shortName` (12 chars), `appDesc` (132 chars)
+- Preserves `description` and `placeholders` fields losslessly
+- Supports Chrome placeholder syntax (`$PLACEHOLDER_NAME$`, `$1`)
+
+**Expected Directory Structure:**
+```
+_locales/
+├── en/
+│   └── messages.json
+├── fr/
+│   └── messages.json
+└── ...
+```
+
 ### View File Information
 
 ```bash
@@ -175,6 +224,10 @@ localizerx info Localizable.xcstrings
 # Fastlane metadata info
 localizerx metadata-info
 localizerx metadata-info ./fastlane/metadata
+
+# Chrome Extension messages info
+localizerx chrome-info
+localizerx chrome-info ./_locales
 ```
 
 Displays statistics: string count, languages, translation coverage, character limits.
@@ -241,6 +294,22 @@ localizerx metadata --to de-DE,fr-FR,ja
 
 # Translate only keywords with truncation if over limit
 localizerx metadata --to es-ES --fields keywords --on-limit truncate
+```
+
+### Chrome Extension Translation
+
+```bash
+# Translate all messages to multiple locales
+localizerx chrome --to fr,de,pt-BR,zh-CN
+
+# Translate specific message keys only
+localizerx chrome --to ja --keys appName,appDesc
+
+# Preview translations before applying
+localizerx chrome --to es --preview
+
+# Truncate Chrome Web Store fields if they exceed character limits
+localizerx chrome --to de --on-limit truncate
 ```
 
 ## Development
