@@ -84,9 +84,11 @@ class TestRoundTrip:
         masked_result = mask_placeholders(original)
 
         # Simulate translation (just the text part changes)
-        translated_masked = masked_result.masked.replace("Hello", "Hola").replace(
-            "you have", "tienes"
-        ).replace("messages from", "mensajes de")
+        translated_masked = (
+            masked_result.masked.replace("Hello", "Hola")
+            .replace("you have", "tienes")
+            .replace("messages from", "mensajes de")
+        )
 
         restored = unmask_placeholders(translated_masked, masked_result.placeholders)
 
@@ -132,3 +134,57 @@ class TestExtractPlaceholders:
 
     def test_extract_empty(self):
         assert extract_placeholders("Hello world") == []
+
+
+class TestDoubleBracePlaceholders:
+    def test_mask_double_brace(self):
+        result = mask_placeholders("Hello {{name}}, welcome to {{app}}")
+        assert result.masked == "Hello __PH_1__, welcome to __PH_2__"
+        assert result.placeholders == {"__PH_1__": "{{name}}", "__PH_2__": "{{app}}"}
+
+    def test_unmask_double_brace(self):
+        masked = "Hola __PH_1__, bienvenido a __PH_2__"
+        placeholders = {"__PH_1__": "{{name}}", "__PH_2__": "{{app}}"}
+        result = unmask_placeholders(masked, placeholders)
+        assert result == "Hola {{name}}, bienvenido a {{app}}"
+
+    def test_count_double_brace(self):
+        assert count_placeholders("{{user}} has {{count}} items") == 2
+
+    def test_validate_double_brace(self):
+        assert validate_placeholders("Hello {{name}}!", "Hola {{name}}!") is True
+        assert validate_placeholders("Hello {{name}}!", "Hola!") is False
+
+    def test_extract_double_brace(self):
+        placeholders = extract_placeholders("{{greeting}}, {{name}}")
+        assert "{{greeting}}" in placeholders
+        assert "{{name}}" in placeholders
+
+
+class TestPositionalBracePlaceholders:
+    def test_mask_positional_brace(self):
+        result = mask_placeholders("Hello {0}, you have {1} messages")
+        assert "__PH_1__" in result.masked
+        assert "__PH_2__" in result.masked
+        assert "{0}" in result.placeholders.values()
+        assert "{1}" in result.placeholders.values()
+
+    def test_unmask_positional_brace(self):
+        masked = "Hola __PH_1__, tienes __PH_2__ mensajes"
+        placeholders = {"__PH_1__": "{0}", "__PH_2__": "{1}"}
+        result = unmask_placeholders(masked, placeholders)
+        assert result == "Hola {0}, tienes {1} mensajes"
+
+    def test_count_positional_brace(self):
+        assert count_placeholders("{0} has {1} items") == 2
+
+    def test_validate_positional_brace(self):
+        assert validate_placeholders("Hello {0}!", "Hola {0}!") is True
+        assert validate_placeholders("Hello {0}!", "Hola!") is False
+
+    def test_mixed_double_and_positional(self):
+        text = "{{greeting}} {0}!"
+        result = mask_placeholders(text)
+        assert len(result.placeholders) == 2
+        assert "{{greeting}}" in result.placeholders.values()
+        assert "{0}" in result.placeholders.values()

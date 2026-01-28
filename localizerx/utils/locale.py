@@ -446,3 +446,90 @@ def standard_to_chrome_locale(code: str) -> str:
         'en'
     """
     return code.replace("-", "_")
+
+
+# Android locale directory name mappings
+# BCP 47 tag → Android values directory suffix
+# Simple cases: "fr" → "values-fr", "pt-BR" → "values-pt-rBR"
+# Script tags: "zh-Hans" → "values-b+zh+Hans"
+
+
+def standard_to_android_locale(code: str) -> str:
+    """
+    Convert a standard locale code to Android resource directory suffix.
+
+    Examples:
+        >>> standard_to_android_locale("fr")
+        'fr'
+        >>> standard_to_android_locale("pt-BR")
+        'pt-rBR'
+        >>> standard_to_android_locale("zh-Hans")
+        'b+zh+Hans'
+        >>> standard_to_android_locale("zh-Hant-TW")
+        'b+zh+Hant+TW'
+    """
+    parts = code.split("-")
+    if len(parts) == 1:
+        return parts[0]
+
+    # Check if any part is a script tag (4 letters, e.g. Hans, Hant)
+    has_script = any(len(p) == 4 and p[0].isupper() for p in parts[1:])
+
+    if has_script:
+        # Use BCP 47 tag format: b+lang+Script+Region
+        return "b+" + "+".join(parts)
+
+    # Simple region: pt-BR → pt-rBR
+    if len(parts) == 2 and len(parts[1]) == 2:
+        return f"{parts[0]}-r{parts[1]}"
+
+    # Numeric region codes like es-419
+    if len(parts) == 2 and parts[1].isdigit():
+        return f"{parts[0]}-r{parts[1]}"
+
+    # Fallback: join with hyphens
+    return code
+
+
+def android_to_standard_locale(code: str) -> str:
+    """
+    Convert an Android resource directory suffix to standard locale code.
+
+    Examples:
+        >>> android_to_standard_locale("fr")
+        'fr'
+        >>> android_to_standard_locale("pt-rBR")
+        'pt-BR'
+        >>> android_to_standard_locale("b+zh+Hans")
+        'zh-Hans'
+        >>> android_to_standard_locale("b+zh+Hant+TW")
+        'zh-Hant-TW'
+    """
+    # BCP 47 tag format: b+lang+Script+Region
+    if code.startswith("b+"):
+        parts = code[2:].split("+")
+        return "-".join(parts)
+
+    # Region format: pt-rBR → pt-BR
+    if "-r" in code:
+        parts = code.split("-r", 1)
+        return f"{parts[0]}-{parts[1]}"
+
+    return code
+
+
+def validate_android_locale(code: str) -> bool:
+    """
+    Check if a locale code is valid for Android resources.
+
+    Accepts standard BCP 47 codes that can be mapped to Android dir names.
+
+    Examples:
+        >>> validate_android_locale("en")
+        True
+        >>> validate_android_locale("pt-BR")
+        True
+        >>> validate_android_locale("zh-Hans")
+        True
+    """
+    return validate_language_code(code)

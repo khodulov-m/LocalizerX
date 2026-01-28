@@ -1,13 +1,15 @@
 # LocalizerX
 
-CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`) and App Store metadata using Gemini API.
+CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`), App Store metadata, Chrome Extension messages, frontend i18n JSON files, and Android `strings.xml` using Gemini API.
 
 ## Features
 
 - Translate `.xcstrings` files to multiple languages with a single command
 - Translate fastlane App Store metadata (name, subtitle, description, keywords, etc.)
 - Translate Chrome Extension `_locales/` message files with SEO-optimized prompts
-- Preserve placeholders (`%@`, `%d`, `{name}`, `$PLACEHOLDER$`, `$1`) during translation
+- Translate frontend i18n JSON files (Vue.js, React i18next, Angular, etc.)
+- Translate Android `res/values/strings.xml` files (strings, string-arrays, plurals)
+- Preserve placeholders (`%@`, `%d`, `{name}`, `{{name}}`, `{0}`, `$PLACEHOLDER$`, `$1`) during translation
 - Support for pluralization and declension forms
 - Use developer comments for translation context
 - SQLite caching to reduce API calls
@@ -215,6 +217,78 @@ _locales/
 └── ...
 ```
 
+### Translate Frontend i18n JSON Files
+
+Translate JSON-based i18n files used by Vue.js, React i18next, Angular, and other frameworks:
+
+```bash
+# Translate to French and German
+localizerx i18n --to fr,de
+
+# Specify path to locales directory
+localizerx i18n ./src/locales --to es,ja
+
+# Dry run to see what would be translated
+localizerx i18n --to fr --dry-run
+```
+
+**Supported Layouts:**
+- Flat files: `locales/en.json`, `locales/fr.json`
+- Directory-per-locale: `locales/en/translation.json`
+
+Nested JSON structures are preserved losslessly (e.g., `{"common": {"ok": "OK"}}`).
+
+**Auto-detected directories:** `locales/`, `src/locales/`, `i18n/`, `src/i18n/`, `public/locales/`, `lang/`
+
+### i18n Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--to` | `-t` | Target locales (comma-separated, e.g., `fr,es,de`) |
+| `--src` | `-s` | Source locale (default: `en`) |
+| `--dry-run` | `-n` | Show what would be translated without changes |
+| `--preview` | `-p` | Preview translations before applying |
+| `--overwrite` | | Overwrite existing translations |
+| `--no-backup` | | Don't create backup before changes |
+| `--batch-size` | | Strings per API call (1-100) |
+| `--model` | `-m` | Gemini model to use |
+
+### Translate Android strings.xml
+
+Translate Android string resources from `res/` directories:
+
+```bash
+# Translate strings to French and German
+localizerx android --to fr,de
+
+# Include string-arrays and plurals
+localizerx android --to ja --include-arrays --include-plurals
+
+# Specify path to res/ directory
+localizerx android ./app/src/main/res --to es,pt-BR
+```
+
+**Supported resources:** `<string>`, `<string-array>`, `<plurals>`
+
+Respects `translatable="false"` attributes. Handles Android locale directory naming (`values-pt-rBR`, `values-b+zh+Hans`).
+
+**Auto-detected directories:** `res/`, `app/src/main/res/`, `src/main/res/`
+
+### Android Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--to` | `-t` | Target locales (comma-separated, e.g., `fr,es,de,pt-BR`) |
+| `--src` | `-s` | Source locale (default: `en`) |
+| `--include-arrays` | | Also translate `<string-array>` resources |
+| `--include-plurals` | | Also translate `<plurals>` resources |
+| `--dry-run` | `-n` | Show what would be translated without changes |
+| `--preview` | `-p` | Preview translations before applying |
+| `--overwrite` | | Overwrite existing translations |
+| `--no-backup` | | Don't create backup before changes |
+| `--batch-size` | | Strings per API call (1-100) |
+| `--model` | `-m` | Gemini model to use |
+
 ### View File Information
 
 ```bash
@@ -228,6 +302,14 @@ localizerx metadata-info ./fastlane/metadata
 # Chrome Extension messages info
 localizerx chrome-info
 localizerx chrome-info ./_locales
+
+# Frontend i18n info
+localizerx i18n-info
+localizerx i18n-info ./src/locales
+
+# Android resources info
+localizerx android-info
+localizerx android-info ./app/src/main/res
 ```
 
 Displays statistics: string count, languages, translation coverage, character limits.
@@ -310,6 +392,29 @@ localizerx chrome --to es --preview
 
 # Truncate Chrome Web Store fields if they exceed character limits
 localizerx chrome --to de --on-limit truncate
+```
+
+### Frontend i18n Translation
+
+```bash
+# Translate all i18n keys
+localizerx i18n --to fr,de,ja
+
+# Preview before applying
+localizerx i18n --to es --preview
+```
+
+### Android Translation
+
+```bash
+# Translate strings only
+localizerx android --to fr,de,pt-BR
+
+# Translate strings, arrays, and plurals
+localizerx android --to ja --include-arrays --include-plurals
+
+# Overwrite existing translations
+localizerx android --to es --overwrite
 ```
 
 ## Development

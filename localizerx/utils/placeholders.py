@@ -28,6 +28,12 @@ PRINTF_PATTERNS = [
     r"%[@dDuUxXoOfeEgGcCsSpaAni%]",
 ]
 
+# Double-brace placeholder patterns: {{name}}, {{count}}, etc. (Angular/Handlebars)
+DOUBLE_BRACE_PLACEHOLDER_PATTERN = r"\{\{[a-zA-Z_][a-zA-Z0-9_]*\}\}"
+
+# Positional brace patterns: {0}, {1}, etc. (Java MessageFormat / ICU)
+POSITIONAL_BRACE_PATTERN = r"\{\d+\}"
+
 # Named placeholder patterns: {name}, {count}, etc.
 NAMED_PLACEHOLDER_PATTERN = r"\{[a-zA-Z_][a-zA-Z0-9_]*\}"
 
@@ -37,8 +43,10 @@ CHROME_NAMED_PLACEHOLDER_PATTERN = r"\$[a-zA-Z_][a-zA-Z0-9_]*\$"
 # $1-style positional placeholders (e.g., $1, $2)
 CHROME_POSITIONAL_PLACEHOLDER_PATTERN = r"\$\d+"
 
-# Combine all patterns
+# Combine all patterns (order matters: more specific patterns first)
 ALL_PATTERNS = PRINTF_PATTERNS + [
+    DOUBLE_BRACE_PLACEHOLDER_PATTERN,
+    POSITIONAL_BRACE_PATTERN,
     NAMED_PLACEHOLDER_PATTERN,
     CHROME_NAMED_PLACEHOLDER_PATTERN,
     CHROME_POSITIONAL_PLACEHOLDER_PATTERN,
