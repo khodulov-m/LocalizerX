@@ -161,9 +161,13 @@ class TestConstants:
         assert "appName" in KNOWN_CWS_KEYS
         assert "shortName" in KNOWN_CWS_KEYS
         assert "appDesc" in KNOWN_CWS_KEYS
+        assert "shortDesc" in KNOWN_CWS_KEYS
+        assert "storeDesc" in KNOWN_CWS_KEYS
         assert "greeting" not in KNOWN_CWS_KEYS
 
     def test_field_limits(self):
         assert EXTENSION_FIELD_LIMITS[ExtensionFieldType.APP_NAME] == 75
         assert EXTENSION_FIELD_LIMITS[ExtensionFieldType.SHORT_NAME] == 12
         assert EXTENSION_FIELD_LIMITS[ExtensionFieldType.DESCRIPTION] == 132
+        assert EXTENSION_FIELD_LIMITS[ExtensionFieldType.SHORT_DESC] == 132
+        assert EXTENSION_FIELD_LIMITS[ExtensionFieldType.STORE_DESC] == 16383
