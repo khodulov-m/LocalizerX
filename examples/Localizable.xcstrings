@@ -11,10 +11,10 @@
             "value": "Welcome to the app!"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Добро пожаловать в приложение!"
+            "value": "Bienvenue dans l'application !"
           }
         },
         "es": {
@@ -23,28 +23,10 @@
             "value": "¡Bienvenido a la app!"
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bienvenue dans l'application !"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bem-vindo ao app!"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "¡Bienvenido a la app!"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Benvenuto nell'app!"
+            "value": "Willkommen in der App!"
           }
         },
         "ja": {
@@ -53,52 +35,10 @@
             "value": "アプリへようこそ！"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Witaj w aplikacji!"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Velkommen til appen!"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Willkommen in der App!"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Welkom bij de app!"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "앱에 오신 것을 환영합니다!"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Velkommen til appen!"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Välkommen till appen!"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bine ai venit în aplicație!"
+            "value": "Добро пожаловать в приложение!"
           }
         }
       }
@@ -113,10 +53,10 @@
             "value": "Hello, %@!"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Привет, %@!"
+            "value": "Bonjour, %@ !"
           }
         },
         "es": {
@@ -125,28 +65,10 @@
             "value": "¡Hola, %@!"
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bonjour, %@ !"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Olá, %@!"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "¡Hola, %@!"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ciao, %@!"
+            "value": "Hallo, %@!"
           }
         },
         "ja": {
@@ -155,52 +77,10 @@
             "value": "こんにちは、%@さん！"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Witaj, %@!"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hei, %@!"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hallo, %@!"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hallo, %@!"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "안녕하세요, %@님!"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hej, %@!"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hej, %@!"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salut, %@!"
+            "value": "Здравствуйте, %@!"
           }
         }
       }
@@ -215,10 +95,10 @@
             "value": "You have %d items in your cart"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "В вашей корзине %d товаров"
+            "value": "Vous avez %d articles dans votre panier"
           }
         },
         "es": {
@@ -227,28 +107,10 @@
             "value": "Tienes %d artículos en tu carrito"
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vous avez %d articles dans votre panier"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Você tem %d itens no seu carrinho"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tienes %d artículos en tu carrito"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hai %d articoli nel carrello"
+            "value": "Du hast %d Artikel in deinem Warenkorb"
           }
         },
         "ja": {
@@ -257,52 +119,10 @@
             "value": "カートに%d個の商品があります"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Masz %d przedmiotów w koszyku"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Du har %d varer i handlekurven din"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Du hast %d Artikel in deinem Warenkorb"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Je hebt %d items in je winkelwagen"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "장바구니에 %d개의 상품이 있습니다."
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Du har %d varer i din kurv"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Du har %d artiklar i din varukorg"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ai %d articole în coș"
+            "value": "У вас %d товаров в корзине"
           }
         }
       }
@@ -316,10 +136,10 @@
             "value": "Settings"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Настройки"
+            "value": "Réglages"
           }
         },
         "es": {
@@ -328,28 +148,10 @@
             "value": "Ajustes"
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Réglages"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configurações"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configuración"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impostazioni"
+            "value": "Einstellungen"
           }
         },
         "ja": {
@@ -358,52 +160,10 @@
             "value": "設定"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ustawienia"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Innstillinger"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einstellungen"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Instellingen"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "설정"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Indstillinger"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inställningar"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Setări"
+            "value": "Настройки"
           }
         }
       }
@@ -417,10 +177,10 @@
             "value": "Log Out"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Выйти"
+            "value": "Se déconnecter"
           }
         },
         "es": {
@@ -429,28 +189,10 @@
             "value": "Cerrar sesión"
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Se déconnecter"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sair"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerrar sesión"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esci"
+            "value": "Abmelden"
           }
         },
         "ja": {
@@ -459,52 +201,10 @@
             "value": "ログアウト"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wyloguj"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Logg ut"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abmelden"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uitloggen"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "로그아웃"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Log ud"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Logga ut"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deconectare"
+            "value": "Выйти"
           }
         }
       }
@@ -519,10 +219,10 @@
             "value": "Network error. Please check your connection and try again."
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ошибка сети. Проверьте подключение и попробуйте снова."
+            "value": "Erreur réseau. Veuillez vérifier votre connexion et réessayer."
           }
         },
         "es": {
@@ -531,28 +231,10 @@
             "value": "Error de red. Por favor, comprueba tu conexión e inténtalo de nuevo."
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Erreur réseau. Veuillez vérifier votre connexion et réessayer."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Erro de rede. Verifique sua conexão e tente novamente."
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Error de red. Por favor, revisa tu conexión e inténtalo de nuevo."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Errore di rete. Controlla la tua connessione e riprova."
+            "value": "Netzwerkfehler. Bitte überprüfe deine Verbindung und versuche es erneut."
           }
         },
         "ja": {
@@ -561,52 +243,10 @@
             "value": "ネットワークエラーです。接続を確認して、もう一度お試しください。"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Błąd sieci. Sprawdź połączenie i spróbuj ponownie."
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nettverksfeil. Vennligst sjekk tilkoblingen din og prøv igjen."
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Netzwerkfehler. Bitte überprüfe deine Verbindung und versuche es erneut."
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Netwerkfout. Controleer je verbinding en probeer het opnieuw."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "네트워크 오류입니다. 연결 상태를 확인하고 다시 시도해 주세요."
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Netværksfejl. Tjek venligst din forbindelse og prøv igen."
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nätverksfel. Kontrollera din anslutning och försök igen."
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eroare de rețea. Verifică-ți conexiunea și încearcă din nou."
+            "value": "Сетевая ошибка. Проверьте подключение и попробуйте снова."
           }
         }
       }
@@ -621,10 +261,10 @@
             "value": "Uploading... %.1f%% complete"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Загрузка... %.1f%% завершено"
+            "value": "Téléchargement... %.1f%% terminé"
           }
         },
         "es": {
@@ -633,82 +273,22 @@
             "value": "Subiendo... %.1f%% completado"
           }
         },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Téléchargement en cours... %.1f%% terminé"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enviando... %.1f%% concluído"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Subiendo... %.1f%% completado"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Caricamento in corso... %.1f%% completato"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アップロード中… %.1f%%完了"
-          }
-        },
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Przesyłanie... %.1f%% zakończone"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Laster opp... %.1f%% fullført"
-          }
-        },
-        "de-DE": {
+        "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Hochladen... %.1f%% abgeschlossen"
           }
         },
-        "nl": {
+        "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uploaden... %.1f%% voltooid"
+            "value": "アップロード中... %.1f%%完了"
           }
         },
-        "ko": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "업로드 중... %.1f%% 완료"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Overfører... %.1f%% fuldført"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Laddar upp... %.1f%% klar"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se încarcă... %.1f%% finalizat"
+            "value": "Загрузка... %.1f%% завершена"
           }
         }
       }
@@ -723,10 +303,10 @@
             "value": "Created on %1$@ at %2$@"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Создано %1$@ в %2$@"
+            "value": "Créé le %1$@ à %2$@"
           }
         },
         "es": {
@@ -735,28 +315,10 @@
             "value": "Creado el %1$@ a las %2$@"
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Créé le %1$@ à %2$@"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Criado em %1$@ às %2$@"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Creado el %1$@ a las %2$@"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Creato il %1$@ alle %2$@"
+            "value": "Erstellt am %1$@ um %2$@"
           }
         },
         "ja": {
@@ -765,52 +327,10 @@
             "value": "%1$@ %2$@作成"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utworzono %1$@ o %2$@"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Opprettet %1$@ kl. %2$@"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Erstellt am %1$@ um %2$@"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gemaakt op %1$@ om %2$@"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ %2$@에 생성됨"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oprettet den %1$@ kl. %2$@"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Skapad den %1$@ kl. %2$@"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Creat pe %1$@ la %2$@"
+            "value": "Создано %1$@ в %2$@"
           }
         }
       }
@@ -824,10 +344,10 @@
             "value": "Save"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Сохранить"
+            "value": "Enregistrer"
           }
         },
         "es": {
@@ -836,28 +356,10 @@
             "value": "Guardar"
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enregistrer"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvar"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Guardar"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salva"
+            "value": "Speichern"
           }
         },
         "ja": {
@@ -866,52 +368,10 @@
             "value": "保存"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zapisz"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lagre"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Speichern"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Opslaan"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "저장"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gem"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spara"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salvează"
+            "value": "Сохранить"
           }
         }
       }
@@ -925,10 +385,10 @@
             "value": "Cancel"
           }
         },
-        "ru": {
+        "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Отмена"
+            "value": "Annuler"
           }
         },
         "es": {
@@ -937,28 +397,10 @@
             "value": "Cancelar"
           }
         },
-        "fr": {
+        "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Annuler"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancelar"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancelar"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Annulla"
+            "value": "Abbrechen"
           }
         },
         "ja": {
@@ -967,74 +409,20 @@
             "value": "キャンセル"
           }
         },
-        "pl": {
+        "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anuluj"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avbryt"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abbrechen"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Annuleren"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "취소"
-          }
-        },
-        "da": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Annuller"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avbryt"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Anulare"
+            "value": "Отмена"
           }
         }
       }
     },
     "Terms of Use (EULA)": {
       "localizations": {
-        "da": {
+        "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Brugsbetingelser (EULA)"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nutzungsbedingungen (EULA)"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Términos de uso (EULA)"
+            "value": "Terms of Use (EULA)"
           }
         },
         "fr": {
@@ -1043,52 +431,22 @@
             "value": "Conditions d'utilisation (CLUF)"
           }
         },
-        "it": {
+        "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Termini di utilizzo (EULA)"
+            "value": "Términos de Uso (CLUF)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nutzungsbedingungen (EULA)"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "利用規約 (EULA)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이용 약관 (EULA)"
-          }
-        },
-        "nb": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bruksvilkår (EULA)"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gebruiksvoorwaarden (EULA)"
-          }
-        },
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Warunki użytkowania (EULA)"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termos de Uso (EULA)"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termeni de Utilizare (EULA)"
+            "value": "利用規約（EULA）"
           }
         },
         "ru": {
@@ -1096,41 +454,16 @@
             "state": "translated",
             "value": "Условия использования (EULA)"
           }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Användarvillkor (EULA)"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bruksvilkår (EULA)"
-          }
         }
       }
     },
     "This action cannot be undone. All your data will be permanently deleted.\n\nType DELETE to confirm.": {
       "comment": "An alert message displayed when a user attempts to delete their account. It explains that the action cannot be undone and asks the user to confirm by typing \"DELETE\".",
-      "isCommentAutoGenerated": true,
       "localizations": {
-        "da": {
+        "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Denne handling kan ikke fortrydes. Alle dine data vil blive slettet permanent.\n\nSkriv DELETE for at bekræfte."
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Diese Aktion kann nicht rückgängig gemacht werden. Alle Ihre Daten werden dauerhaft gelöscht.\n\nGeben Sie DELETE ein, um zu bestätigen."
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esta acción no se puede deshacer. Todos tus datos se eliminarán permanentemente.\n\nEscribe ELIMINAR para confirmar."
+            "value": "This action cannot be undone. All your data will be permanently deleted.\n\nType DELETE to confirm."
           }
         },
         "fr": {
@@ -1139,94 +472,39 @@
             "value": "Cette action est irréversible. Toutes vos données seront définitivement supprimées.\n\nTapez SUPPRIMER pour confirmer."
           }
         },
-        "it": {
+        "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Questa azione non può essere annullata. Tutti i tuoi dati verranno eliminati in modo permanente.\n\nDigita ELIMINA per confermare."
+            "value": "Esta acción no se puede deshacer. Todos tus datos se eliminarán permanentemente.\n\nEscribe ELIMINAR para confirmar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Daten werden dauerhaft gelöscht.\n\nGib DELETE ein, um zu bestätigen."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "この操作は元に戻せません。すべてのデータは永久に削除されます。\n\n確認するにはDELETEと入力してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이 작업은 되돌릴 수 없습니다. 모든 데이터가 영구적으로 삭제됩니다.\n\n확인하려면 DELETE를 입력하세요."
-          }
-        },
-        "nb": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Denne handlingen kan ikke angres. Alle dine data vil bli permanent slettet.\n\nSkriv DELETE for å bekrefte."
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deze actie kan niet ongedaan worden gemaakt. Al uw gegevens worden permanent verwijderd.\n\nTyp DELETE om te bevestigen."
-          }
-        },
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tej akcji nie można cofnąć. Wszystkie Twoje dane zostaną trwale usunięte.\n\nWpisz DELETE, aby potwierdzić."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esta ação não pode ser desfeita. Todos os seus dados serão permanentemente excluídos.\n\nDigite EXCLUIR para confirmar."
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Această acțiune nu poate fi anulată. Toate datele tale vor fi șterse permanent.\n\nScrie DELETE pentru a confirma."
+            "value": "この操作は元に戻せません。すべてのデータは完全に削除されます。\n\n確認するにはDELETEと入力してください。"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Это действие необратимо. Все ваши данные будут удалены навсегда.\n\nВведите DELETE для подтверждения."
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Den här åtgärden kan inte ångras. Alla dina data kommer att raderas permanent.\n\nSkriv DELETE för att bekräfta."
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Denne handlingen kan ikke angres. Alle dine data vil bli permanent slettet.\n\nSkriv DELETE for å bekrefte."
+            "value": "Это действие нельзя отменить. Все ваши данные будут безвозвратно удалены.\n\nВведите DELETE для подтверждения."
           }
         }
       }
     },
     "Tier": {
       "comment": "A label describing the option to select a subscription tier.",
-      "isCommentAutoGenerated": true,
       "localizations": {
-        "da": {
+        "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Niveau"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stufe"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nivel"
+            "value": "Tier"
           }
         },
         "fr": {
@@ -1235,10 +513,16 @@
             "value": "Niveau"
           }
         },
-        "it": {
+        "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Livello"
+            "value": "Nivel"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stufe"
           }
         },
         "ja": {
@@ -1247,94 +531,39 @@
             "value": "ティア"
           }
         },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "등급"
-          }
-        },
-        "nb": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nivå"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Niveau"
-          }
-        },
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Poziom"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nível"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nivel"
-          }
-        },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Тариф"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nivå"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nivå"
+            "value": "Уровень"
           }
         }
       }
     },
     "Toggles password visibility": {
       "comment": "An accessibility hint for the password visibility toggle button.",
-      "isCommentAutoGenerated": true,
       "localizations": {
-        "da": {
+        "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Skifter synlighed af adgangskode"
-          }
-        },
-        "de-DE": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Schaltet die Passwortsichtbarkeit um"
-          }
-        },
-        "es-MX": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alterna la visibilidad de la contraseña"
+            "value": "Toggles password visibility"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Active/désactive la visibilité du mot de passe"
+            "value": "Affiche ou masque le mot de passe"
           }
         },
-        "it": {
+        "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mostra/nasconde la password"
+            "value": "Muestra u oculta la visibilidad de la contraseña"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schaltet die Sichtbarkeit des Passworts um"
           }
         },
         "ja": {
@@ -1343,58 +572,10 @@
             "value": "パスワードの表示を切り替えます"
           }
         },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "비밀번호 표시 전환"
-          }
-        },
-        "nb": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Veksler synlighet av passord"
-          }
-        },
-        "nl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Schakelt wachtwoordzichtbaarheid"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alterna a visibilidade da senha"
-          }
-        },
-        "ro": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Comută vizibilitatea parolei"
-          }
-        },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Переключает видимость пароля"
-          }
-        },
-        "sv": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Växlar lösenordets synlighet"
-          }
-        },
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Przełącza widoczność hasła"
-          }
-        },
-        "no": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Veksler synlighet av passord"
+            "value": "Показывает/скрывает пароль"
           }
         }
       }

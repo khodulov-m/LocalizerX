@@ -255,13 +255,14 @@ Text to translate:
         """Build translation prompt for batch."""
         prompt = f"""Translate the following {count} texts from {src_name} to {tgt_name}.
 
-IMPORTANT RULES:
+CRITICAL RULES:
 1. Keep all placeholders exactly as they are (like __PH_1__, __PH_2__, etc.)
 2. Preserve any formatting, line breaks, and punctuation style
 3. Translate naturally, not word-for-word
 4. This is for an iOS/macOS app interface
-5. Return ONLY the translations using the same <<ITEM_N>> markers
+5. Return ONLY the translations using the EXACT SAME <<ITEM_N>> markers
 6. Do NOT include any context notes, explanations, or metadata in the translations
+7. IMPORTANT: Each <<ITEM_N>> block is ONE translation unit. If the source has multiple paragraphs or blank lines, the translation MUST also have multiple paragraphs within the SAME <<ITEM_N>> block. NEVER split multi-paragraph content across different ITEM markers.
 
 Texts to translate:
 {batch_text}"""
@@ -270,7 +271,7 @@ Texts to translate:
             prompt += "\n\nContext notes (for your reference only, do NOT include in translations):\n"
             prompt += "\n".join(contexts)
 
-        prompt += "\n\nTranslations (use the same <<ITEM_N>> markers, translate ONLY the text between markers):"
+        prompt += f"\n\nTranslations (output exactly {count} items using <<ITEM_1>> through <<ITEM_{count}>> markers, one translation per marker, preserving all paragraphs within each item):"
         return prompt
 
     def _parse_batch_response(self, response: str, expected_count: int) -> list[str]:
