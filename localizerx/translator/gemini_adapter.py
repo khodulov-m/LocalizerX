@@ -211,16 +211,18 @@ class GeminiTranslator(Translator):
             result = await self._call_api(prompt)
             return [result]
 
-        # Build batch prompt
+        # Build batch prompt with unique markers to avoid confusion with numbered lists in content
         texts = []
+        contexts = []
         for i, (_, req, masked_text, _) in enumerate(items):
-            entry = f"{i + 1}. {masked_text}"
-            if req.comment:
-                entry += f" [Context: {req.comment}]"
+            # Use unique markers that won't appear in normal content
+            entry = f"<<ITEM_{i + 1}>>\n{masked_text}\n<</ITEM_{i + 1}>>"
             texts.append(entry)
+            if req.comment:
+                contexts.append(f"Item {i + 1}: {req.comment}")
 
-        batch_text = "\n".join(texts)
-        prompt = self._build_batch_prompt(batch_text, len(items), src_name, tgt_name)
+        batch_text = "\n\n".join(texts)
+        prompt = self._build_batch_prompt(batch_text, len(items), src_name, tgt_name, contexts)
 
         response = await self._call_api(prompt)
         return self._parse_batch_response(response, len(items))
@@ -247,25 +249,80 @@ Text to translate:
         return prompt
 
     def _build_batch_prompt(
-        self, batch_text: str, count: int, src_name: str, tgt_name: str
+        self, batch_text: str, count: int, src_name: str, tgt_name: str,
+        contexts: list[str] | None = None
     ) -> str:
         """Build translation prompt for batch."""
-        return f"""Translate the following {count} texts from {src_name} to {tgt_name}.
+        prompt = f"""Translate the following {count} texts from {src_name} to {tgt_name}.
 
 IMPORTANT RULES:
 1. Keep all placeholders exactly as they are (like __PH_1__, __PH_2__, etc.)
-2. Preserve any formatting and punctuation style
+2. Preserve any formatting, line breaks, and punctuation style
 3. Translate naturally, not word-for-word
 4. This is for an iOS/macOS app interface
-5. Return ONLY the translations, numbered to match the input
+5. Return ONLY the translations using the same <<ITEM_N>> markers
+6. Do NOT include any context notes, explanations, or metadata in the translations
 
 Texts to translate:
-{batch_text}
+{batch_text}"""
 
-Translations (numbered to match, one per line):"""
+        if contexts:
+            prompt += "\n\nContext notes (for your reference only, do NOT include in translations):\n"
+            prompt += "\n".join(contexts)
+
+        prompt += "\n\nTranslations (use the same <<ITEM_N>> markers, translate ONLY the text between markers):"
+        return prompt
 
     def _parse_batch_response(self, response: str, expected_count: int) -> list[str]:
         """Parse batch translation response.
+
+        Extracts translations from <<ITEM_N>>...<</ITEM_N>> markers.
+        Falls back to numbered list parsing if markers are not found.
+        """
+        import re
+
+        # First, try to parse using our unique markers
+        results: list[str] = []
+        for i in range(1, expected_count + 1):
+            # Match content between <<ITEM_N>> and <</ITEM_N>>
+            pattern = rf"<<ITEM_{i}>>\s*(.*?)\s*<</ITEM_{i}>>"
+            match = re.search(pattern, response, re.DOTALL)
+            if match:
+                text = match.group(1).strip()
+                # Clean up any context metadata that might have leaked through
+                text = self._strip_context_metadata(text)
+                results.append(text)
+            else:
+                results.append("")
+
+        # If we got results with markers, return them
+        if any(results):
+            return results
+
+        # Fallback: parse old-style numbered responses (for backwards compatibility)
+        return self._parse_numbered_response(response, expected_count)
+
+    def _strip_context_metadata(self, text: str) -> str:
+        """Remove any context metadata that leaked into the translation."""
+        import re
+        # Remove [Context: ...], [Контекст: ...], [Contexto: ...], etc.
+        # This handles various language variants of "Context"
+        patterns = [
+            r"\s*\[Context:.*?\]",
+            r"\s*\[Контекст:.*?\]",
+            r"\s*\[Contexto:.*?\]",
+            r"\s*\[Contexte:.*?\]",
+            r"\s*\[Contesto:.*?\]",
+            r"\s*\[Kontext:.*?\]",
+            r"\s*\[컨텍스트:.*?\]",
+            r"\s*\[コンテキスト:.*?\]",
+        ]
+        for pattern in patterns:
+            text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
+        return text.strip()
+
+    def _parse_numbered_response(self, response: str, expected_count: int) -> list[str]:
+        """Parse old-style numbered batch response (fallback).
 
         Handles multi-line translations by grouping lines between numbered items.
         E.g. "1. first line\\nsecond line\\n2. another" -> ["first line\\nsecond line", "another"]
@@ -275,15 +332,31 @@ Translations (numbered to match, one per line):"""
         lines = response.strip().split("\n")
         results: list[list[str]] = []
         current_lines: list[str] = []
+        current_item_num: int | None = None  # Track which item we're currently building
 
         for line in lines:
             # Check if this line starts a new numbered item
-            match = re.match(r"^\d+[\.\)\:]\s*(.*)", line)
+            match = re.match(r"^(\d+)[\.\)\:]\s*(.*)", line)
             if match:
-                # Save previous item if any
-                if current_lines:
-                    results.append(current_lines)
-                current_lines = [match.group(1)] if match.group(1) else []
+                num = int(match.group(1))
+                # Calculate expected next number
+                # If we're building an item (current_item_num is set), next should be current + 1
+                # Otherwise, next should be 1
+                expected_next = (current_item_num + 1) if current_item_num is not None else 1
+
+                # Treat as a new item marker if the number is sequential
+                # This prevents inner numbered lists (like "1. Step one" inside content)
+                # from being treated as item boundaries
+                if num == expected_next:
+                    # Save previous item if any
+                    if current_lines:
+                        results.append(current_lines)
+                    current_lines = [match.group(2)] if match.group(2) else []
+                    current_item_num = num
+                else:
+                    # This numbered line is content, not a marker (non-sequential number)
+                    if results or current_lines:
+                        current_lines.append(line)
             else:
                 # Continuation of current item (or leading text before first number)
                 if results or current_lines:
@@ -298,6 +371,9 @@ Translations (numbered to match, one per line):"""
 
         # Join multi-line items back together
         joined = ["\n".join(lines_group) for lines_group in results]
+
+        # Strip context metadata from each result
+        joined = [self._strip_context_metadata(text) for text in joined]
 
         # Pad with empty strings if we got fewer results
         while len(joined) < expected_count:
