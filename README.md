@@ -171,6 +171,46 @@ localizerx metadata --to de-DE --on-limit truncate
 | `--no-backup` | | Don't create backup before changes |
 | `--model` | `-m` | Gemini model to use |
 
+### Check Metadata Character Limits
+
+Validate that your App Store metadata fields comply with Apple's character limits:
+
+```bash
+# Check all fields in all locales
+localizerx metadata-check
+
+# Check specific locale
+localizerx metadata-check --locale de-DE
+
+# Check specific field
+localizerx metadata-check --field subtitle
+
+# Check specific field in specific locale
+localizerx metadata-check --locale en-US --field name
+
+# Specify metadata directory
+localizerx metadata-check ./fastlane/metadata
+```
+
+**Character Limits:**
+- Name: 30 characters
+- Subtitle: 30 characters
+- Keywords: 100 characters
+- Description: 4,000 characters
+- Promotional text: 170 characters
+- Release notes: 4,000 characters
+
+**Exit Codes:**
+- `0` - All fields are within limits
+- `1` - One or more fields exceed limits (useful for CI/CD)
+
+### Metadata Check Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--locale` | `-l` | Check specific locale only (default: all locales) |
+| `--field` | `-f` | Check specific field only (e.g., `name`, `subtitle`, `keywords`) |
+
 ### Translate App Store Screenshot Texts
 
 Translate marketing texts displayed on App Store screenshots. Texts are ASO-optimized with a 5-word limit for maximum impact.
