@@ -50,10 +50,12 @@ CLI (Typer)
 - `localizerx/parser/model.py` - Entry and Translation data models
 - `localizerx/parser/extension_model.py` - Chrome Extension message and catalog data models
 - `localizerx/parser/screenshots_model.py` - Screenshot text data models (ScreenshotsCatalog, ScreenshotScreen, etc.)
+- `localizerx/parser/app_context.py` - AppContext data class for screenshot text generation
 - `localizerx/translator/base.py` - Abstract translator interface
 - `localizerx/translator/gemini_adapter.py` - Gemini API implementation (async)
 - `localizerx/translator/extension_prompts.py` - SEO-optimized prompts for Chrome Web Store fields
-- `localizerx/translator/screenshots_prompts.py` - ASO-optimized prompts for screenshot texts (5-word limit)
+- `localizerx/translator/screenshots_prompts.py` - ASO-optimized prompts for screenshot text translation (5-word limit)
+- `localizerx/translator/screenshots_generation_prompts.py` - ASO-optimized prompts for screenshot text generation
 - `localizerx/utils/placeholders.py` - Placeholder masking/unmasking (%@, %d, {name}, $NAME$, $1)
 - `localizerx/utils/locale.py` - Language/locale mapping
 - `localizerx/utils/limits.py` - Character limit validation (App Store + Chrome Web Store)
@@ -99,6 +101,13 @@ ScreenshotsCatalog:
   source_language: str
   screens: dict[str, ScreenshotScreen]
   localizations: dict[str, ScreenshotLocale]
+
+AppContext:
+  name: str
+  subtitle: str | None
+  promo_text: str | None
+  description: str | None
+  keywords: list[str] | None
 ```
 
 ## Environment Variables

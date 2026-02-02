@@ -2716,6 +2716,470 @@ def screenshots_info(
         console.print("[dim]No localizations yet[/dim]")
 
 
+@app.command("screenshots-generate")
+def screenshots_generate(
+    path: Annotated[
+        Optional[Path],
+        typer.Argument(
+            help="Path to screenshots/texts.json (auto-detected or created if omitted)",
+        ),
+    ] = None,
+    metadata_path: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--metadata",
+            help="Path to fastlane/metadata directory (auto-detected if omitted)",
+        ),
+    ] = None,
+    hints: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--hints",
+            help="JSON file with screen descriptions (interactive mode if omitted)",
+        ),
+    ] = None,
+    text_types: Annotated[
+        Optional[str],
+        typer.Option(
+            "--text-types",
+            help="Comma-separated text types to generate (default: headline,subtitle)",
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            "-n",
+            help="Show prompts without making API calls",
+        ),
+    ] = False,
+    preview: Annotated[
+        bool,
+        typer.Option(
+            "--preview",
+            "-p",
+            help="Show generated texts before saving",
+        ),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite",
+            help="Overwrite existing source texts",
+        ),
+    ] = False,
+    no_backup: Annotated[
+        bool,
+        typer.Option(
+            "--no-backup",
+            help="Don't create backup before writing changes",
+        ),
+    ] = False,
+    model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--model",
+            "-m",
+            help="Gemini model to use (see 'localizerx models' for list)",
+        ),
+    ] = None,
+    src: Annotated[
+        str,
+        typer.Option(
+            "--src",
+            "-s",
+            help="Source language for the generated texts (default: en)",
+        ),
+    ] = "en",
+) -> None:
+    """Generate marketing-optimized screenshot texts using Gemini AI.
+
+    Reads app context from fastlane/metadata to understand your app,
+    then generates compelling screenshot texts based on screen descriptions.
+
+    Two modes:
+    - Interactive: prompts for screen descriptions one by one
+    - Hints file: reads descriptions from a JSON file (--hints)
+
+    Examples:
+
+        # Interactive mode - prompts for screen descriptions
+        localizerx screenshots-generate
+
+        # From hints file
+        localizerx screenshots-generate --hints hints.json
+
+        # Generate only headlines
+        localizerx screenshots-generate --text-types headline
+
+        # Preview before saving
+        localizerx screenshots-generate --preview
+    """
+    _run_screenshots_generate(
+        path=path,
+        metadata_path=metadata_path,
+        hints_path=hints,
+        text_types=text_types,
+        dry_run=dry_run,
+        preview=preview,
+        overwrite=overwrite,
+        backup=not no_backup,
+        model=model,
+        src_lang=src,
+    )
+
+
+def _run_screenshots_generate(
+    path: Path | None,
+    metadata_path: Path | None,
+    hints_path: Path | None,
+    text_types: str | None,
+    dry_run: bool,
+    preview: bool,
+    overwrite: bool,
+    backup: bool,
+    model: str | None,
+    src_lang: str,
+) -> None:
+    """Core screenshots generation logic."""
+    from localizerx.io.metadata import detect_metadata_path, read_metadata
+    from localizerx.io.screenshots import (
+        detect_screenshots_path,
+        get_default_screenshots_path,
+        read_hints_file,
+        read_screenshots,
+        write_screenshots,
+    )
+    from localizerx.parser.app_context import AppContext
+    from localizerx.parser.screenshots_model import (
+        DeviceClass,
+        ScreenshotsCatalog,
+        ScreenshotScreen,
+        ScreenshotText,
+        ScreenshotTextType,
+    )
+
+    config = load_config()
+
+    # Parse text types to generate
+    if text_types:
+        type_names = [t.strip().lower() for t in text_types.split(",")]
+        types_to_generate = []
+        for name in type_names:
+            try:
+                types_to_generate.append(ScreenshotTextType(name))
+            except ValueError:
+                console.print(f"[yellow]Warning:[/yellow] Unknown text type '{name}'")
+        if not types_to_generate:
+            console.print("[red]Error:[/red] No valid text types specified")
+            raise typer.Exit(1)
+    else:
+        # Default: headline and subtitle
+        types_to_generate = [ScreenshotTextType.HEADLINE, ScreenshotTextType.SUBTITLE]
+
+    # Detect or read metadata for app context
+    if metadata_path is None:
+        metadata_path = detect_metadata_path()
+
+    if metadata_path is None:
+        console.print("[yellow]Warning:[/yellow] No fastlane/metadata found")
+        console.print("Creating minimal app context. For better results, create fastlane/metadata.")
+        app_context = AppContext(name="App")
+    else:
+        try:
+            # Read metadata with en-US as default source locale
+            catalog = read_metadata(metadata_path, source_locale="en-US")
+            source_metadata = catalog.get_source_metadata()
+            if source_metadata is None:
+                # Try to find any locale with data
+                for locale in ["en-US", "en", "en-GB"]:
+                    source_metadata = catalog.get_locale(locale)
+                    if source_metadata and source_metadata.field_count > 0:
+                        break
+
+            if source_metadata:
+                app_context = AppContext.from_metadata(source_metadata)
+                console.print(f"[green]Reading app context from {metadata_path}[/green]")
+                console.print(f"  App: {app_context.name}")
+                if app_context.subtitle:
+                    console.print(f"  Subtitle: {app_context.subtitle}")
+            else:
+                console.print("[yellow]Warning:[/yellow] No source metadata found")
+                app_context = AppContext(name="App")
+        except Exception as e:
+            console.print(f"[yellow]Warning:[/yellow] Failed to read metadata: {e}")
+            app_context = AppContext(name="App")
+
+    console.print()
+
+    # Get screen hints (from file or interactive)
+    if hints_path:
+        try:
+            screen_hints = read_hints_file(hints_path)
+            console.print(f"[green]Read {len(screen_hints)} screen hints from {hints_path}[/green]")
+        except (FileNotFoundError, ValueError) as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1)
+    else:
+        # Interactive mode
+        screen_hints = _interactive_screen_hints()
+
+    if not screen_hints:
+        console.print("[yellow]No screens defined. Exiting.[/yellow]")
+        raise typer.Exit(0)
+
+    console.print()
+    console.print(f"[bold]Screens:[/bold] {len(screen_hints)}")
+    console.print(f"[bold]Text types:[/bold] {', '.join(t.value for t in types_to_generate)}")
+    console.print()
+
+    # Determine screenshots file path
+    if path is None:
+        path = detect_screenshots_path()
+    if path is None:
+        path = get_default_screenshots_path()
+
+    # Load existing catalog or create new one
+    if path.exists():
+        try:
+            catalog = read_screenshots(path)
+            console.print(f"[dim]Using existing file: {path}[/dim]")
+        except Exception:
+            catalog = ScreenshotsCatalog(source_language=src_lang)
+    else:
+        catalog = ScreenshotsCatalog(source_language=src_lang)
+        console.print(f"[dim]Will create new file: {path}[/dim]")
+
+    # Determine which texts need to be generated
+    generation_tasks: list[tuple[str, ScreenshotTextType, DeviceClass, str]] = []
+
+    for screen_id, hint in screen_hints.items():
+        for text_type in types_to_generate:
+            for device_class in DeviceClass:
+                # Check if text already exists
+                screen = catalog.screens.get(screen_id)
+                if screen and not overwrite:
+                    existing_text = screen.get_text(text_type)
+                    if existing_text:
+                        existing_value = existing_text.get_variant(device_class)
+                        if existing_value and existing_value.strip():
+                            continue  # Skip - already exists
+
+                generation_tasks.append((screen_id, text_type, device_class, hint))
+
+    if not generation_tasks:
+        console.print("[green]All texts already exist (use --overwrite to regenerate)[/green]")
+        return
+
+    console.print(f"[bold]Texts to generate:[/bold] {len(generation_tasks)}")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run - showing prompts without API calls[/yellow]")
+        _show_generation_dry_run(app_context, generation_tasks)
+        return
+
+    # Perform generation
+    asyncio.run(
+        _generate_screenshots(
+            catalog=catalog,
+            path=path,
+            app_context=app_context,
+            generation_tasks=generation_tasks,
+            config=config,
+            preview=preview,
+            backup=backup,
+            model=model,
+        )
+    )
+
+
+def _interactive_screen_hints() -> dict[str, str]:
+    """Interactively prompt for screen descriptions."""
+    console.print("[bold]Interactive mode[/bold] - describe each screenshot screen")
+    console.print("[dim]Enter screen descriptions to help generate marketing text.[/dim]")
+    console.print("[dim]Press Enter with empty description to finish.[/dim]")
+    console.print()
+
+    screen_hints: dict[str, str] = {}
+    screen_num = 1
+
+    while True:
+        # Prompt for screen ID
+        default_id = f"screen_{screen_num}"
+        screen_id = typer.prompt(
+            f"Screen {screen_num} ID",
+            default=default_id,
+            show_default=True,
+        )
+
+        if not screen_id:
+            break
+
+        # Prompt for description
+        description = typer.prompt(
+            f"  Description (what does this screen show?)",
+            default="",
+        )
+
+        if not description:
+            console.print("[dim]  Empty description, skipping this screen[/dim]")
+            if not screen_hints:
+                continue  # Keep asking if no screens yet
+            break
+
+        screen_hints[screen_id] = description
+        screen_num += 1
+        console.print()
+
+    return screen_hints
+
+
+def _show_generation_dry_run(
+    app_context,
+    tasks: list[tuple[str, str, str, str]],
+) -> None:
+    """Show generation prompts for dry run."""
+    from localizerx.translator.screenshots_generation_prompts import build_generation_prompt
+
+    console.print("\n[bold]Prompts that would be sent:[/bold]\n")
+
+    # Show first few prompts
+    for i, (screen_id, text_type, device_class, hint) in enumerate(tasks[:3]):
+        prompt = build_generation_prompt(
+            app_context=app_context,
+            screen_id=screen_id,
+            text_type=text_type,
+            device_class=device_class,
+            user_hint=hint,
+        )
+
+        console.print(f"[cyan]--- {screen_id} / {text_type.value} / {device_class.value} ---[/cyan]")
+        # Show truncated prompt
+        lines = prompt.split("\n")
+        preview_lines = lines[:15]
+        console.print("\n".join(preview_lines))
+        if len(lines) > 15:
+            console.print(f"[dim]... ({len(lines) - 15} more lines)[/dim]")
+        console.print()
+
+    if len(tasks) > 3:
+        console.print(f"[dim]... and {len(tasks) - 3} more prompts[/dim]")
+
+
+async def _generate_screenshots(
+    catalog,
+    path: Path,
+    app_context,
+    generation_tasks: list[tuple[str, str, str, str]],
+    config,
+    preview: bool,
+    backup: bool,
+    model: str | None,
+) -> None:
+    """Perform screenshot text generation and update file."""
+    from localizerx.io.screenshots import write_screenshots
+    from localizerx.parser.screenshots_model import DeviceClass, ScreenshotTextType
+    from localizerx.translator.screenshots_generation_prompts import build_generation_prompt
+
+    cache_dir = get_cache_dir(config)
+    actual_model = model or config.translator.model
+
+    # {(screen_id, text_type, device_class): generated_text}
+    all_generations: dict[tuple, str] = {}
+
+    async with GeminiTranslator(
+        model=actual_model,
+        batch_size=1,
+        max_retries=config.translator.max_retries,
+        cache_dir=cache_dir,
+    ) as translator:
+        console.print("Generating screenshot texts...")
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Generating", total=len(generation_tasks))
+
+            for screen_id, text_type, device_class, hint in generation_tasks:
+                # Build generation prompt
+                prompt = build_generation_prompt(
+                    app_context=app_context,
+                    screen_id=screen_id,
+                    text_type=text_type,
+                    device_class=device_class,
+                    user_hint=hint,
+                )
+
+                try:
+                    generated = await translator._call_api(prompt)
+                    generated = generated.strip()
+                except Exception as e:
+                    console.print(
+                        f"  [red]Error generating {screen_id}/{text_type.value}: {e}[/red]"
+                    )
+                    progress.advance(task)
+                    continue
+
+                all_generations[(screen_id, text_type, device_class)] = generated
+                progress.advance(task)
+
+    if not all_generations:
+        console.print("[red]No texts were generated[/red]")
+        return
+
+    # Show preview if requested
+    if preview:
+        _show_generation_preview(all_generations)
+        if not typer.confirm("Save these generated texts?"):
+            console.print("  [yellow]Cancelled[/yellow]")
+            return
+
+    # Update catalog
+    for (screen_id, text_type, device_class), generated_text in all_generations.items():
+        screen = catalog.get_or_create_source_screen(screen_id)
+        screen.set_text_variant(text_type, device_class, generated_text)
+
+    # Write file
+    write_screenshots(catalog, path, backup=backup)
+
+    console.print(f"\n[green]Saved {len(all_generations)} generated texts to {path}[/green]")
+    console.print("\nNext steps:")
+    console.print("  1. Review and edit the generated texts in the file")
+    console.print("  2. Translate to other languages with:")
+    console.print("     localizerx screenshots --to de,fr,es")
+
+
+def _show_generation_preview(generations: dict) -> None:
+    """Show preview of generated texts."""
+    table = Table(title="Generated Texts Preview")
+    table.add_column("Screen", style="cyan")
+    table.add_column("Type", style="yellow")
+    table.add_column("Device", style="blue")
+    table.add_column("Generated Text", style="green")
+
+    count = 0
+    for (screen_id, text_type, device_class), text in generations.items():
+        text_preview = text[:40] + "..." if len(text) > 40 else text
+        table.add_row(
+            screen_id,
+            text_type.value,
+            device_class.value,
+            text_preview,
+        )
+        count += 1
+        if count >= 20:
+            break
+
+    if len(generations) > 20:
+        table.add_row("...", "", "", f"({len(generations) - 20} more)")
+
+    console.print(table)
+
+
 def _run_screenshots_translate(
     path: Path | None,
     to: str,

@@ -291,3 +291,48 @@ def screenshots_file_exists(path: Path | None = None) -> bool:
 
     detected = detect_screenshots_path()
     return detected is not None
+
+
+def read_hints_file(path: Path) -> dict[str, str]:
+    """
+    Read screen hints/descriptions from a JSON file.
+
+    Expected format:
+    {
+        "screen_1": "Main dashboard showing daily progress",
+        "screen_2": "Settings page with customization options",
+        "screen_3": "Achievement system and rewards"
+    }
+
+    Args:
+        path: Path to the hints JSON file
+
+    Returns:
+        Dictionary mapping screen IDs to their descriptions
+
+    Raises:
+        FileNotFoundError: If the file does not exist
+        ValueError: If the file is not valid JSON or has wrong format
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"Hints file not found: {path}")
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in hints file: {e}")
+
+    if not isinstance(data, dict):
+        raise ValueError("Hints file must contain a JSON object")
+
+    # Validate all values are strings
+    hints = {}
+    for key, value in data.items():
+        if not isinstance(key, str):
+            raise ValueError(f"Hint keys must be strings, got: {type(key)}")
+        if not isinstance(value, str):
+            raise ValueError(f"Hint values must be strings, got: {type(value)} for key '{key}'")
+        hints[key] = value
+
+    return hints

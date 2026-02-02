@@ -6,6 +6,7 @@ CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`), App 
 
 - Translate `.xcstrings` files to multiple languages with a single command
 - Translate fastlane App Store metadata (name, subtitle, description, keywords, etc.)
+- Generate App Store screenshot texts using AI with app context from fastlane metadata
 - Translate App Store screenshot texts with ASO-optimized, marketing-focused prompts
 - Translate Chrome Extension `_locales/` message files with SEO-optimized prompts
 - Translate frontend i18n JSON files (Vue.js, React i18next, Angular, etc.)
@@ -237,6 +238,82 @@ localizerx screenshots --to de --dry-run
 - Auto-generates template if `screenshots/texts.json` doesn't exist
 - Lossless round-trip (preserves JSON structure)
 
+### Generate App Store Screenshot Texts
+
+Automatically generate marketing-optimized screenshot texts using AI. The command reads your app context from fastlane/metadata (app name, subtitle, description) to generate relevant, on-brand copy.
+
+```bash
+# Interactive mode - prompts for screen descriptions
+localizerx screenshots-generate
+
+# From hints file (JSON with screen descriptions)
+localizerx screenshots-generate --hints hints.json
+
+# Generate only headlines (default: headline,subtitle)
+localizerx screenshots-generate --text-types headline
+
+# Preview generated texts before saving
+localizerx screenshots-generate --preview
+
+# Dry run - show prompts without API calls
+localizerx screenshots-generate --dry-run
+
+# Overwrite existing texts
+localizerx screenshots-generate --overwrite
+```
+
+**Interactive Mode:**
+
+When run without `--hints`, the command enters interactive mode:
+
+```
+$ localizerx screenshots-generate
+
+Reading app context from fastlane/metadata/en-US...
+  App: MyApp
+  Subtitle: Track your habits daily
+
+Screen 1 ID [screen_1]:
+  Description (what does this screen show?): Main dashboard showing daily progress
+
+Screen 2 ID [screen_2]:
+  Description (what does this screen show?): Detailed statistics and charts
+
+Generating texts...
+```
+
+**Hints File Format (`hints.json`):**
+
+```json
+{
+  "screen_1": "Main dashboard showing daily progress tracking",
+  "screen_2": "Settings page with customization options",
+  "screen_3": "Achievement system and rewards"
+}
+```
+
+### Screenshots Generate Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--hints` | | Path to JSON file with screen descriptions |
+| `--metadata` | | Path to fastlane/metadata (auto-detected if omitted) |
+| `--text-types` | | Text types to generate (comma-separated, default: `headline,subtitle`) |
+| `--src` | `-s` | Source language for generated texts (default: `en`) |
+| `--dry-run` | `-n` | Show prompts without making API calls |
+| `--preview` | `-p` | Preview generated texts before saving |
+| `--overwrite` | | Overwrite existing source texts |
+| `--no-backup` | | Don't create backup before changes |
+| `--model` | `-m` | Gemini model to use |
+
+**Key Features:**
+- Reads app context from fastlane/metadata for relevant generation
+- ASO-optimized prompts (marketing-focused, benefit-oriented)
+- Maximum 5 words per text (hard limit)
+- Device-aware generation (small = extra concise, large = slightly more descriptive)
+- Interactive mode or batch mode via hints file
+- Generates both `small` and `large` variants for each text type
+
 ### Translate Chrome Extension Messages
 
 Translate Chrome Extension `_locales/` message files:
@@ -448,6 +525,25 @@ localizerx metadata --to de-DE,fr-FR,ja
 
 # Translate only keywords with truncation if over limit
 localizerx metadata --to es-ES --fields keywords --on-limit truncate
+```
+
+### Screenshot Texts Generation
+
+```bash
+# Generate texts interactively (prompts for screen descriptions)
+localizerx screenshots-generate
+
+# Generate from a hints file with screen descriptions
+localizerx screenshots-generate --hints hints.json
+
+# Generate only headlines
+localizerx screenshots-generate --text-types headline
+
+# Preview before saving
+localizerx screenshots-generate --preview
+
+# Dry run to see the prompts
+localizerx screenshots-generate --dry-run
 ```
 
 ### Screenshot Texts Translation
