@@ -894,6 +894,165 @@ def metadata_info(
         console.print(field_table)
 
 
+@app.command("metadata-check")
+def metadata_check(
+    path: Annotated[
+        Optional[Path],
+        typer.Argument(
+            help="Path to fastlane metadata directory (auto-detected if omitted)",
+        ),
+    ] = None,
+    locale: Annotated[
+        Optional[str],
+        typer.Option(
+            "--locale",
+            "-l",
+            help="Check specific locale only (default: all locales)",
+        ),
+    ] = None,
+    field: Annotated[
+        Optional[str],
+        typer.Option(
+            "--field",
+            "-f",
+            help="Check specific field only (e.g., name, subtitle, keywords)",
+        ),
+    ] = None,
+) -> None:
+    """Check metadata files for App Store character limit compliance."""
+    from localizerx.io.metadata import detect_metadata_path, read_metadata
+    from localizerx.parser.metadata_model import MetadataFieldType
+    from localizerx.utils.limits import validate_limit
+
+    # Find metadata path
+    if path is None:
+        path = detect_metadata_path()
+        if path is None:
+            console.print("[red]Error:[/red] No metadata directory found")
+            console.print("Run from a directory with fastlane/metadata or specify path")
+            raise typer.Exit(1)
+
+    if not path.exists():
+        console.print(f"[red]Error:[/red] Path does not exist: {path}")
+        raise typer.Exit(1)
+
+    # Parse field filter
+    field_type_filter: MetadataFieldType | None = None
+    if field:
+        try:
+            field_type_filter = MetadataFieldType(field.lower())
+        except ValueError:
+            console.print(f"[red]Error:[/red] Invalid field type: {field}")
+            console.print(
+                f"Valid fields: {', '.join(f.value for f in MetadataFieldType)}"
+            )
+            raise typer.Exit(1)
+
+    # Read metadata
+    try:
+        catalog = read_metadata(path)
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    # Filter locales
+    locales_to_check = [locale] if locale else list(catalog.locales.keys())
+    locales_to_check = [loc for loc in locales_to_check if loc in catalog.locales]
+
+    if not locales_to_check:
+        console.print("[red]Error:[/red] No valid locales to check")
+        raise typer.Exit(1)
+
+    # Check all fields
+    all_valid = True
+    violations = []
+
+    for locale_code in sorted(locales_to_check):
+        locale_meta = catalog.locales[locale_code]
+        locale_name = get_fastlane_locale_name(locale_code)
+
+        # Filter fields if specified
+        if field_type_filter:
+            # Only check the specified field if it exists in this locale
+            fields_to_check = (
+                {field_type_filter: locale_meta.fields[field_type_filter]}
+                if field_type_filter in locale_meta.fields
+                else {}
+            )
+        else:
+            # Check all fields
+            fields_to_check = locale_meta.fields
+
+        for field_type, metadata_field in fields_to_check.items():
+            result = validate_limit(metadata_field.content, field_type)
+
+            if not result.is_valid:
+                all_valid = False
+                violations.append(
+                    {
+                        "locale": locale_code,
+                        "locale_name": locale_name,
+                        "field_type": field_type,
+                        "result": result,
+                    }
+                )
+
+    # Display results
+    console.print(f"[bold]Metadata Directory:[/bold] {path}")
+    console.print(f"[bold]Locales Checked:[/bold] {len(locales_to_check)}")
+    console.print(f"[bold]Fields Checked:[/bold] {field or 'all'}")
+    console.print()
+
+    if all_valid:
+        console.print("[green]✓ All fields are within character limits[/green]")
+        console.print()
+
+        # Show summary table
+        summary_table = Table(title="Character Limit Summary")
+        summary_table.add_column("Field", style="cyan")
+        summary_table.add_column("Limit", style="white")
+
+        field_types_to_show = (
+            [field_type_filter] if field_type_filter else list(MetadataFieldType)
+        )
+        for ft in field_types_to_show:
+            from localizerx.parser.metadata_model import FIELD_LIMITS
+
+            summary_table.add_row(ft.value, str(FIELD_LIMITS[ft]))
+
+        console.print(summary_table)
+    else:
+        console.print(
+            f"[red]✗ Found {len(violations)} field(s) exceeding character limits[/red]"
+        )
+        console.print()
+
+        # Show violations table
+        violations_table = Table(title="Character Limit Violations")
+        violations_table.add_column("Locale", style="cyan")
+        violations_table.add_column("Field", style="yellow")
+        violations_table.add_column("Characters", style="white")
+        violations_table.add_column("Limit", style="white")
+        violations_table.add_column("Over By", style="red")
+
+        for v in violations:
+            result = v["result"]
+            violations_table.add_row(
+                f"{v['locale']}\n{v['locale_name']}",
+                result.field_type.value,
+                str(result.char_count),
+                str(result.limit),
+                str(result.chars_over),
+            )
+
+        console.print(violations_table)
+        console.print()
+        console.print(
+            "[yellow]Tip:[/yellow] Use --field to check a specific field or --locale to check a specific locale"
+        )
+        raise typer.Exit(1)
+
+
 def _run_metadata_translate(
     path: Path | None,
     to: str,

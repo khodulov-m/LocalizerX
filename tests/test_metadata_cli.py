@@ -238,3 +238,113 @@ class TestMetadataDryRunOutput:
         # Should show source length and limit columns
         assert "Source Length" in result.stdout or "Chars" in result.stdout
         assert "Limit" in result.stdout
+
+
+@pytest.fixture
+def metadata_with_overlimit():
+    """Create a metadata directory with over-limit fields."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+
+        # Create en-US locale with over-limit fields
+        en_dir = tmpdir / "en-US"
+        en_dir.mkdir()
+        (en_dir / "name.txt").write_text("x" * 40 + "\n")  # Limit is 30
+        (en_dir / "subtitle.txt").write_text("x" * 35 + "\n")  # Limit is 30
+        (en_dir / "keywords.txt").write_text("x" * 120 + "\n")  # Limit is 100
+        (en_dir / "description.txt").write_text("Valid description\n")
+
+        # Create de-DE locale with over-limit field
+        de_dir = tmpdir / "de-DE"
+        de_dir.mkdir()
+        (de_dir / "name.txt").write_text("y" * 45 + "\n")  # Limit is 30
+
+        yield tmpdir
+
+
+class TestMetadataCheckCommand:
+    """Tests for metadata-check command."""
+
+    def test_metadata_check_all_valid(self, sample_metadata_dir):
+        """Test metadata-check when all fields are valid."""
+        result = runner.invoke(app, ["metadata-check", str(sample_metadata_dir)])
+        assert result.exit_code == 0
+        assert "All fields are within character limits" in result.stdout
+        assert "Character Limit Summary" in result.stdout
+
+    def test_metadata_check_with_violations(self, metadata_with_overlimit):
+        """Test metadata-check when fields exceed limits."""
+        result = runner.invoke(app, ["metadata-check", str(metadata_with_overlimit)])
+        assert result.exit_code == 1
+        assert "field(s) exceeding character limits" in result.stdout
+        assert "Character Limit Violations" in result.stdout
+
+    def test_metadata_check_single_locale(self, metadata_with_overlimit):
+        """Test metadata-check with --locale filter."""
+        result = runner.invoke(
+            app, ["metadata-check", str(metadata_with_overlimit), "--locale", "en-US"]
+        )
+        assert result.exit_code == 1
+        assert "en-US" in result.stdout
+        # Should only show violations for en-US
+        assert result.stdout.count("en-US") >= 2
+
+    def test_metadata_check_single_field(self, metadata_with_overlimit):
+        """Test metadata-check with --field filter."""
+        result = runner.invoke(
+            app, ["metadata-check", str(metadata_with_overlimit), "--field", "name"]
+        )
+        assert result.exit_code == 1
+        assert "name" in result.stdout
+        # Should only check 'name' field
+        assert "subtitle" not in result.stdout or "Keywords" not in result.stdout
+
+    def test_metadata_check_valid_field(self, metadata_with_overlimit):
+        """Test metadata-check on a field that's within limits."""
+        result = runner.invoke(
+            app,
+            ["metadata-check", str(metadata_with_overlimit), "--field", "description"],
+        )
+        assert result.exit_code == 0
+        assert "All fields are within character limits" in result.stdout
+
+    def test_metadata_check_invalid_field(self, sample_metadata_dir):
+        """Test metadata-check with invalid field name."""
+        result = runner.invoke(
+            app, ["metadata-check", str(sample_metadata_dir), "--field", "invalid"]
+        )
+        assert result.exit_code == 1
+        assert "Invalid field type" in result.stdout
+
+    def test_metadata_check_invalid_locale(self, sample_metadata_dir):
+        """Test metadata-check with non-existent locale."""
+        result = runner.invoke(
+            app, ["metadata-check", str(sample_metadata_dir), "--locale", "xx-XX"]
+        )
+        assert result.exit_code == 1
+        assert "No valid locales to check" in result.stdout
+
+    def test_metadata_check_invalid_path(self):
+        """Test metadata-check with non-existent path."""
+        result = runner.invoke(app, ["metadata-check", "/nonexistent/path"])
+        assert result.exit_code == 1
+        assert "does not exist" in result.stdout
+
+    def test_metadata_check_auto_detect(self, sample_fastlane_metadata, monkeypatch):
+        """Test metadata-check with auto-detection."""
+        tmpdir, _ = sample_fastlane_metadata
+        monkeypatch.chdir(tmpdir)
+
+        result = runner.invoke(app, ["metadata-check"])
+        assert result.exit_code == 0
+
+    def test_metadata_check_shows_violation_details(self, metadata_with_overlimit):
+        """Test that violations show all required details."""
+        result = runner.invoke(app, ["metadata-check", str(metadata_with_overlimit)])
+        assert result.exit_code == 1
+        # Should show locale, field, characters, limit, and over by
+        assert "Locale" in result.stdout
+        assert "Field" in result.stdout
+        assert "Characters" in result.stdout
+        assert "Limit" in result.stdout
+        assert "Over By" in result.stdout
