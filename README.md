@@ -6,6 +6,7 @@ CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`), App 
 
 - Translate `.xcstrings` files to multiple languages with a single command
 - Translate fastlane App Store metadata (name, subtitle, description, keywords, etc.)
+- Translate App Store screenshot texts with ASO-optimized, marketing-focused prompts
 - Translate Chrome Extension `_locales/` message files with SEO-optimized prompts
 - Translate frontend i18n JSON files (Vue.js, React i18next, Angular, etc.)
 - Translate Android `res/values/strings.xml` files (strings, string-arrays, plurals)
@@ -169,6 +170,73 @@ localizerx metadata --to de-DE --on-limit truncate
 | `--no-backup` | | Don't create backup before changes |
 | `--model` | `-m` | Gemini model to use |
 
+### Translate App Store Screenshot Texts
+
+Translate marketing texts displayed on App Store screenshots. Texts are ASO-optimized with a 5-word limit for maximum impact.
+
+```bash
+# Create a template (if screenshots/texts.json doesn't exist)
+localizerx screenshots
+
+# Translate to specific languages
+localizerx screenshots --to de,fr,es
+
+# Use default_targets from config (if --to is omitted)
+localizerx screenshots
+
+# Specify source language
+localizerx screenshots --src ru --to en,de
+
+# Dry run to see what would be translated
+localizerx screenshots --to de --dry-run
+```
+
+**JSON Structure (`screenshots/texts.json`):**
+```json
+{
+  "sourceLanguage": "en",
+  "screens": {
+    "screen_1": {
+      "headline": { "small": "Track Habits", "large": "Track Your Daily Habits" },
+      "subtitle": { "small": "Stay motivated", "large": "Stay motivated every day" }
+    },
+    "screen_2": {
+      "headline": { "small": "Set Goals", "large": "Set Personal Goals" }
+    }
+  },
+  "localizations": {
+    "de": {
+      "screen_1": {
+        "headline": { "small": "Gewohnheiten tracken", "large": "Tägliche Gewohnheiten" }
+      }
+    }
+  }
+}
+```
+
+**Text Types:** `headline`, `subtitle`, `button`, `caption`, `callout`
+
+**Device Classes:** `small` (iPhone SE, compact), `large` (iPad, Pro Max)
+
+### Screenshots Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--to` | `-t` | Target languages (comma-separated). Uses `default_targets` from config if omitted. |
+| `--src` | `-s` | Source language (default: from file or `en`) |
+| `--dry-run` | `-n` | Show what would be translated without changes |
+| `--preview` | `-p` | Preview translations before applying |
+| `--overwrite` | | Overwrite existing translations |
+| `--no-backup` | | Don't create backup before changes |
+| `--model` | `-m` | Gemini model to use |
+
+**Key Features:**
+- ASO-optimized prompts (not literal translation, but market adaptation)
+- Maximum 5 words per text (hard limit for screenshot readability)
+- Device-aware translation (small = extra short, large = slightly more descriptive)
+- Auto-generates template if `screenshots/texts.json` doesn't exist
+- Lossless round-trip (preserves JSON structure)
+
 ### Translate Chrome Extension Messages
 
 Translate Chrome Extension `_locales/` message files:
@@ -299,6 +367,10 @@ localizerx info Localizable.xcstrings
 localizerx metadata-info
 localizerx metadata-info ./fastlane/metadata
 
+# Screenshot texts info
+localizerx screenshots-info
+localizerx screenshots-info ./screenshots/texts.json
+
 # Chrome Extension messages info
 localizerx chrome-info
 localizerx chrome-info ./_locales
@@ -312,7 +384,7 @@ localizerx android-info
 localizerx android-info ./app/src/main/res
 ```
 
-Displays statistics: string count, languages, translation coverage, character limits.
+Displays statistics: string count, languages, translation coverage, character/word limits.
 
 ### List Available Models
 
@@ -376,6 +448,22 @@ localizerx metadata --to de-DE,fr-FR,ja
 
 # Translate only keywords with truncation if over limit
 localizerx metadata --to es-ES --fields keywords --on-limit truncate
+```
+
+### Screenshot Texts Translation
+
+```bash
+# Create template first time (if file doesn't exist)
+localizerx screenshots
+
+# Then edit screenshots/texts.json and translate
+localizerx screenshots --to de,fr,ja
+
+# Preview translations before applying
+localizerx screenshots --to es --preview
+
+# Overwrite existing translations
+localizerx screenshots --to de --overwrite
 ```
 
 ### Chrome Extension Translation

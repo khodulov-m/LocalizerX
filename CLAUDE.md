@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LocalizerX is a Python CLI tool for macOS that automates translation of Xcode String Catalogs (`.xcstrings` files), App Store metadata, and Chrome Extension `_locales/` message files using Google's Gemini API. It handles placeholder preservation, pluralization rules, and developer comments while translating iOS localization files and Chrome Extension messages.
+LocalizerX is a Python CLI tool for macOS that automates translation of Xcode String Catalogs (`.xcstrings` files), App Store metadata, App Store screenshot texts, and Chrome Extension `_locales/` message files using Google's Gemini API. It handles placeholder preservation, pluralization rules, and developer comments while translating iOS localization files and Chrome Extension messages.
 
 ## Development Commands
 
@@ -46,11 +46,14 @@ CLI (Typer)
 - `localizerx/config.py` - Configuration management (TOML)
 - `localizerx/io/xcstrings.py` - Lossless xcstrings file I/O
 - `localizerx/io/extension.py` - Chrome Extension _locales/ I/O
+- `localizerx/io/screenshots.py` - App Store screenshot texts JSON I/O
 - `localizerx/parser/model.py` - Entry and Translation data models
 - `localizerx/parser/extension_model.py` - Chrome Extension message and catalog data models
+- `localizerx/parser/screenshots_model.py` - Screenshot text data models (ScreenshotsCatalog, ScreenshotScreen, etc.)
 - `localizerx/translator/base.py` - Abstract translator interface
 - `localizerx/translator/gemini_adapter.py` - Gemini API implementation (async)
 - `localizerx/translator/extension_prompts.py` - SEO-optimized prompts for Chrome Web Store fields
+- `localizerx/translator/screenshots_prompts.py` - ASO-optimized prompts for screenshot texts (5-word limit)
 - `localizerx/utils/placeholders.py` - Placeholder masking/unmasking (%@, %d, {name}, $NAME$, $1)
 - `localizerx/utils/locale.py` - Language/locale mapping
 - `localizerx/utils/limits.py` - Character limit validation (App Store + Chrome Web Store)
@@ -84,6 +87,18 @@ ExtensionMessage:
 ExtensionCatalog:
   source_locale: str
   locales: dict[str, ExtensionLocale]
+
+ScreenshotText:
+  small: str | None  # for compact devices (iPhone SE)
+  large: str | None  # for large devices (iPad, Pro Max)
+
+ScreenshotScreen:
+  texts: dict[ScreenshotTextType, ScreenshotText]
+
+ScreenshotsCatalog:
+  source_language: str
+  screens: dict[str, ScreenshotScreen]
+  localizations: dict[str, ScreenshotLocale]
 ```
 
 ## Environment Variables
