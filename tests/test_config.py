@@ -28,15 +28,16 @@ class TestDefaultTargetLanguages:
     def test_default_targets_contains_expected_languages(self):
         """Default targets should contain expected languages."""
         expected = [
-            "ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no",
+            "ru", "fr-FR", "pt-BR", "es-MX", "it", "ja", "pl", "no",
             "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk",
             "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi",
+            "en-GB", "ms", "id", "tr",
         ]
         assert DEFAULT_TARGET_LANGUAGES == expected
 
     def test_default_targets_count(self):
-        """Default targets should have 24 languages."""
-        assert len(DEFAULT_TARGET_LANGUAGES) == 24
+        """Default targets should have 28 languages."""
+        assert len(DEFAULT_TARGET_LANGUAGES) == 28
 
     def test_default_targets_all_strings(self):
         """All default targets should be strings."""
@@ -270,7 +271,7 @@ class TestCreateDefaultConfig:
             content = config_path.read_text()
             # Check some of the expected languages are present
             assert '"ru"' in content
-            assert '"fr"' in content
+            assert '"fr-FR"' in content
             assert '"pt-BR"' in content
             assert '"ja"' in content
             assert '"de-DE"' in content
