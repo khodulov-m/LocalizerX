@@ -3245,8 +3245,10 @@ async def _generate_screenshots(
     from localizerx.parser.screenshots_model import DeviceClass, ScreenshotTextType
     from localizerx.translator.screenshots_generation_prompts import build_generation_prompt
 
+    ss_cfg = config.translator.screenshots
     cache_dir = get_cache_dir(config)
-    actual_model = model or config.translator.model
+    actual_model = model or ss_cfg.model
+    thinking_config = {"thinkingLevel": ss_cfg.thinking_level}
 
     # {(screen_id, text_type, device_class): generated_text}
     all_generations: dict[tuple, str] = {}
@@ -3256,6 +3258,8 @@ async def _generate_screenshots(
         batch_size=1,
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,
+        temperature=ss_cfg.temperature,
+        thinking_config=thinking_config,
     ) as translator:
         console.print("Generating screenshot texts...")
 
@@ -3509,14 +3513,18 @@ async def _translate_screenshots(
     from localizerx.parser.screenshots_model import DeviceClass, ScreenshotTextType
     from localizerx.translator.screenshots_prompts import build_screenshot_prompt
 
+    ss_cfg = config.translator.screenshots
     cache_dir = get_cache_dir(config)
-    actual_model = model or config.translator.model
+    actual_model = model or ss_cfg.model
+    thinking_config = {"thinkingLevel": ss_cfg.thinking_level}
 
     async with GeminiTranslator(
         model=actual_model,
         batch_size=1,  # Screenshot texts are short, translate one at a time
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,
+        temperature=ss_cfg.temperature,
+        thinking_config=thinking_config,
     ) as translator:
         # {lang: {(screen_id, text_type, device_class): translated_text}}
         all_translations: dict[str, dict[tuple, str]] = {}

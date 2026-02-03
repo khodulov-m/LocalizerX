@@ -44,6 +44,8 @@ class GeminiTranslator(Translator):
         batch_size: int = 100,
         max_retries: int = 3,
         cache_dir: Path | None = None,
+        temperature: float = 0.3,
+        thinking_config: dict[str, str] | None = None,
     ):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
@@ -55,6 +57,8 @@ class GeminiTranslator(Translator):
         self.model = model
         self.batch_size = batch_size
         self.max_retries = max_retries
+        self.temperature = temperature
+        self.thinking_config = thinking_config
         self.client = httpx.AsyncClient(timeout=60.0)
 
         # Setup cache
@@ -386,13 +390,17 @@ Texts to translate:
         """Call Gemini API with retry logic."""
         url = f"{GEMINI_API_URL}/{self.model}:generateContent"
 
+        generation_config: dict[str, Any] = {
+            "temperature": self.temperature,
+            "topP": 0.8,
+            "maxOutputTokens": 8192,
+        }
+        if self.thinking_config:
+            generation_config["thinkingConfig"] = self.thinking_config
+
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.3,
-                "topP": 0.8,
-                "maxOutputTokens": 8192,
-            },
+            "generationConfig": generation_config,
         }
 
         last_error = None

@@ -20,12 +20,25 @@ DEFAULT_CACHE_DIR = Path.home() / ".cache" / "localizerx"
 
 # Available Gemini models
 GEMINI_MODELS = [
+    "gemini-3-flash-preview",
     "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
 ]
 
 DEFAULT_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_SCREENSHOTS_MODEL = "gemini-3-flash-preview"
+
+
+VALID_THINKING_LEVELS = ["minimal", "low", "medium", "high"]
+
+
+class ScreenshotsConfig(BaseModel):
+    """Configuration for screenshot text generation/translation."""
+
+    model: str = DEFAULT_SCREENSHOTS_MODEL
+    temperature: float = Field(default=1.0, ge=0.0, le=2.0)
+    thinking_level: str = Field(default="low")
 
 
 class TranslatorConfig(BaseModel):
@@ -35,6 +48,7 @@ class TranslatorConfig(BaseModel):
     model: str = DEFAULT_MODEL
     batch_size: int = Field(default=100, ge=1, le=100)
     max_retries: int = Field(default=3, ge=1, le=10)
+    screenshots: ScreenshotsConfig = Field(default_factory=ScreenshotsConfig)
 
 
 DEFAULT_TARGET_LANGUAGES = [
@@ -132,6 +146,16 @@ batch_size = 100
 
 # Maximum retry attempts for failed requests
 max_retries = 3
+
+[translator.screenshots]
+# Gemini model for screenshot text generation and translation
+model = "gemini-3-flash-preview"
+
+# Sampling temperature (0.0–2.0; higher = more creative)
+temperature = 1.0
+
+# Thinking budget: "minimal", "low", "medium", "high"
+thinking_level = "low"
 '''
 
     config_path.write_text(default_content)
