@@ -15,7 +15,7 @@ CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`), App 
 - Support for pluralization and declension forms
 - Use developer comments for translation context
 - SQLite caching to reduce API calls
-- Automatic backups before changes
+- Optional backups before changes (`--backup`)
 
 ## Installation
 
@@ -87,11 +87,17 @@ Config is created at `~/.config/localizerx/config.toml`:
 source_language = "en"
 
 # Default target languages (used when --to is omitted)
-default_targets = ["ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl", "ko", "da", "sv", "ro"]
+default_targets = [
+    "ru", "fr-FR", "pt-BR", "es-MX", "it", "ja", "pl", "no",
+    "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk",
+    "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi",
+    "en-GB", "ms", "id", "tr",
+]
 
 [translator]
 model = "gemini-2.5-flash-lite"
 batch_size = 100
+temperature = 0.3
 max_retries = 3
 
 cache_enabled = true
@@ -134,9 +140,10 @@ localizerx translate ./MyApp --to fr,es,de
 | `--dry-run` | `-n` | Show what would be translated without changes |
 | `--preview` | `-p` | Preview translations before applying |
 | `--overwrite` | | Overwrite existing translations |
-| `--no-backup` | | Don't create backup before changes |
+| `--backup` | `-b` | Create backup before writing changes |
 | `--batch-size` | | Strings per API call (1-100, default: 100) |
 | `--model` | `-m` | Gemini model to use |
+| `--temperature` | `-T` | Sampling temperature (0.0–2.0). Lower = more deterministic. |
 | `--config` | `-c` | Path to configuration file |
 
 ### Translate App Store Metadata
@@ -168,8 +175,9 @@ localizerx metadata --to de-DE --on-limit truncate
 | `--dry-run` | `-n` | Show what would be translated without changes |
 | `--preview` | `-p` | Preview translations before applying |
 | `--overwrite` | | Overwrite existing translations |
-| `--no-backup` | | Don't create backup before changes |
+| `--backup` | `-b` | Create backup before writing changes |
 | `--model` | `-m` | Gemini model to use |
+| `--temperature` | `-T` | Sampling temperature (0.0–2.0). Lower = more deterministic. |
 
 ### Check Metadata Character Limits
 
@@ -268,7 +276,7 @@ localizerx screenshots --to de --dry-run
 | `--dry-run` | `-n` | Show what would be translated without changes |
 | `--preview` | `-p` | Preview translations before applying |
 | `--overwrite` | | Overwrite existing translations |
-| `--no-backup` | | Don't create backup before changes |
+| `--backup` | `-b` | Create backup before writing changes |
 | `--model` | `-m` | Gemini model to use |
 
 **Key Features:**
@@ -343,7 +351,7 @@ Generating texts...
 | `--dry-run` | `-n` | Show prompts without making API calls |
 | `--preview` | `-p` | Preview generated texts before saving |
 | `--overwrite` | | Overwrite existing source texts |
-| `--no-backup` | | Don't create backup before changes |
+| `--backup` | `-b` | Create backup before writing changes |
 | `--model` | `-m` | Gemini model to use |
 
 **Key Features:**
@@ -383,7 +391,7 @@ localizerx chrome --to pt-BR,zh-CN  # Creates pt_BR/ and zh_CN/
 | `--dry-run` | `-n` | Show what would be translated without changes |
 | `--preview` | `-p` | Preview translations before applying |
 | `--overwrite` | | Overwrite existing translations |
-| `--no-backup` | | Don't create backup before changes |
+| `--backup` | `-b` | Create backup before writing changes |
 | `--model` | `-m` | Gemini model to use |
 
 **Key Features:**
@@ -434,7 +442,7 @@ Nested JSON structures are preserved losslessly (e.g., `{"common": {"ok": "OK"}}
 | `--dry-run` | `-n` | Show what would be translated without changes |
 | `--preview` | `-p` | Preview translations before applying |
 | `--overwrite` | | Overwrite existing translations |
-| `--no-backup` | | Don't create backup before changes |
+| `--backup` | `-b` | Create backup before writing changes |
 | `--batch-size` | | Strings per API call (1-100) |
 | `--model` | `-m` | Gemini model to use |
 
@@ -470,7 +478,7 @@ Respects `translatable="false"` attributes. Handles Android locale directory nam
 | `--dry-run` | `-n` | Show what would be translated without changes |
 | `--preview` | `-p` | Preview translations before applying |
 | `--overwrite` | | Overwrite existing translations |
-| `--no-backup` | | Don't create backup before changes |
+| `--backup` | `-b` | Create backup before writing changes |
 | `--batch-size` | | Strings per API call (1-100) |
 | `--model` | `-m` | Gemini model to use |
 
@@ -513,6 +521,17 @@ localizerx models
 
 ```bash
 localizerx languages
+```
+
+### Clear Translation Cache
+
+Delete the local SQLite translation cache:
+
+```bash
+localizerx cache-clear
+
+# Use a specific config file to locate the cache
+localizerx cache-clear --config ./config.toml
 ```
 
 ### Check Version
