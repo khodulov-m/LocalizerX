@@ -8,7 +8,8 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from localizerx.cli import _find_xcstrings_files, _prompt_file_selection, app
+from localizerx.cli import app
+from localizerx.cli.translate import _find_xcstrings_files, _prompt_file_selection
 from localizerx.config import DEFAULT_TARGET_LANGUAGES
 
 runner = CliRunner()
@@ -119,7 +120,7 @@ class TestPromptFileSelection:
     def test_select_single_file(self, temp_dir_with_multiple_xcstrings):
         """Select a single file by number."""
         _, files = temp_dir_with_multiple_xcstrings
-        with patch("localizerx.cli.typer.prompt", return_value="1"):
+        with patch("localizerx.cli.translate.typer.prompt", return_value="1"):
             selected = _prompt_file_selection(files)
         assert len(selected) == 1
         assert selected[0] == files[0]
@@ -127,35 +128,35 @@ class TestPromptFileSelection:
     def test_select_all_files(self, temp_dir_with_multiple_xcstrings):
         """Select all files with 'a'."""
         _, files = temp_dir_with_multiple_xcstrings
-        with patch("localizerx.cli.typer.prompt", return_value="a"):
+        with patch("localizerx.cli.translate.typer.prompt", return_value="a"):
             selected = _prompt_file_selection(files)
         assert selected == files
 
     def test_select_multiple_files_comma(self, temp_dir_with_multiple_xcstrings):
         """Select multiple files with comma-separated numbers."""
         _, files = temp_dir_with_multiple_xcstrings
-        with patch("localizerx.cli.typer.prompt", return_value="1,2"):
+        with patch("localizerx.cli.translate.typer.prompt", return_value="1,2"):
             selected = _prompt_file_selection(files)
         assert len(selected) == 2
 
     def test_select_range(self, temp_dir_with_multiple_xcstrings):
         """Select files with range notation."""
         _, files = temp_dir_with_multiple_xcstrings
-        with patch("localizerx.cli.typer.prompt", return_value="1-2"):
+        with patch("localizerx.cli.translate.typer.prompt", return_value="1-2"):
             selected = _prompt_file_selection(files)
         assert len(selected) == 2
 
     def test_invalid_selection(self, temp_dir_with_multiple_xcstrings):
         """Invalid selection returns empty list."""
         _, files = temp_dir_with_multiple_xcstrings
-        with patch("localizerx.cli.typer.prompt", return_value="invalid"):
+        with patch("localizerx.cli.translate.typer.prompt", return_value="invalid"):
             selected = _prompt_file_selection(files)
         assert selected == []
 
     def test_out_of_range_ignored(self, temp_dir_with_multiple_xcstrings):
         """Out of range numbers are ignored."""
         _, files = temp_dir_with_multiple_xcstrings
-        with patch("localizerx.cli.typer.prompt", return_value="1,99"):
+        with patch("localizerx.cli.translate.typer.prompt", return_value="1,99"):
             selected = _prompt_file_selection(files)
         assert len(selected) == 1
         assert selected[0] == files[0]
@@ -163,7 +164,7 @@ class TestPromptFileSelection:
     def test_duplicates_removed(self, temp_dir_with_multiple_xcstrings):
         """Duplicate selections are removed."""
         _, files = temp_dir_with_multiple_xcstrings
-        with patch("localizerx.cli.typer.prompt", return_value="1,1,1"):
+        with patch("localizerx.cli.translate.typer.prompt", return_value="1,1,1"):
             selected = _prompt_file_selection(files)
         assert len(selected) == 1
 
