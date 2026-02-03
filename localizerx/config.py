@@ -38,7 +38,7 @@ class TranslatorConfig(BaseModel):
 
 
 DEFAULT_TARGET_LANGUAGES = [
-    "ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl", "ko", "da", "sv", "ro"
+    "ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk", "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi"
 ]
 
 
@@ -106,7 +106,7 @@ source_language = "en"
 
 # Default target languages (used when --to is omitted)
 # Run: localizerx translate (without --to) to translate to all these languages
-default_targets = ["ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl", "ko", "da", "sv", "ro"]
+default_targets = ["ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk", "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi"]
 
 # Number of concurrent translation requests
 concurrency = 5

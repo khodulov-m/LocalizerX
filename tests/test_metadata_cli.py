@@ -50,11 +50,11 @@ def sample_fastlane_metadata():
 class TestMetadataCommand:
     """Tests for metadata command."""
 
-    def test_metadata_requires_to_option(self, sample_metadata_dir):
-        """Test that --to option is required."""
-        result = runner.invoke(app, ["metadata", str(sample_metadata_dir)])
-        assert result.exit_code == 1
-        assert "--to option is required" in result.stdout
+    def test_metadata_uses_default_targets(self, sample_metadata_dir):
+        """Test that omitting --to falls back to default_targets from config."""
+        result = runner.invoke(app, ["metadata", str(sample_metadata_dir), "--dry-run"])
+        assert result.exit_code == 0
+        assert "Using default targets from config" in result.stdout
 
     def test_metadata_dry_run(self, sample_metadata_dir):
         """Test metadata command with --dry-run."""

@@ -698,7 +698,7 @@ def metadata(
         typer.Option(
             "--to",
             "-t",
-            help="Target locales (comma-separated, e.g., 'de-DE,fr-FR,es-ES')",
+            help="Target locales (comma-separated, e.g., 'de-DE,fr-FR,es-ES'). Omit to use defaults from config.",
         ),
     ] = "",
     src: Annotated[
@@ -764,10 +764,6 @@ def metadata(
     ] = None,
 ) -> None:
     """Translate fastlane App Store metadata to target locales."""
-    if not to:
-        console.print("[red]Error:[/red] --to option is required (e.g., --to de-DE,fr-FR)")
-        raise typer.Exit(1)
-
     # Validate on_limit option
     from localizerx.utils.limits import LimitAction
 
@@ -1072,10 +1068,19 @@ def _run_metadata_translate(
     # Load configuration
     config = load_config()
 
-    # Parse target locales
-    target_locales = parse_fastlane_locale_list(to)
+    # Parse target locales (use config defaults if not specified)
+    if to:
+        target_locales = parse_fastlane_locale_list(to)
+    else:
+        target_locales = config.default_targets.copy()
+        if target_locales:
+            console.print(
+                f"[dim]Using default targets from config ({len(target_locales)} languages)[/dim]"
+            )
+
     if not target_locales:
-        console.print("[red]Error:[/red] No valid target locales specified")
+        console.print("[red]Error:[/red] No target locales specified")
+        console.print("Use --to option or set default_targets in config.toml")
         raise typer.Exit(1)
 
     # Validate locales
@@ -3386,15 +3391,19 @@ def _run_screenshots_translate(
     # Determine source language
     source_lang = src if src else catalog.source_language
 
-    # Parse target languages
+    # Parse target languages (use config defaults if not specified)
     if to:
         target_langs = parse_language_list(to)
     else:
-        target_langs = config.default_targets
+        target_langs = config.default_targets.copy()
+        if target_langs:
+            console.print(
+                f"[dim]Using default targets from config ({len(target_langs)} languages)[/dim]"
+            )
 
     if not target_langs:
         console.print("[red]Error:[/red] No target languages specified")
-        console.print("Use --to or set default_targets in config")
+        console.print("Use --to option or set default_targets in config.toml")
         raise typer.Exit(1)
 
     # Validate
