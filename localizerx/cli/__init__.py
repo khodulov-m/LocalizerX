@@ -14,6 +14,8 @@ from localizerx.config import (
     DEFAULT_MODEL,
     GEMINI_MODELS,
     create_default_config,
+    get_cache_dir,
+    load_config,
 )
 
 # Create the main app first
@@ -198,6 +200,35 @@ def languages() -> None:
         table.add_row(code, name)
 
     console.print(table)
+
+
+@app.command("cache-clear")
+def cache_clear(
+    config_path: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--config",
+            "-c",
+            help="Path to configuration file",
+        ),
+    ] = None,
+) -> None:
+    """Clear the translation cache."""
+    config = load_config(config_path)
+    cache_dir = get_cache_dir(config)
+
+    if cache_dir is None:
+        console.print("[yellow]Caching is disabled — nothing to clear.[/yellow]")
+        raise typer.Exit(0)
+
+    db_path = cache_dir / "translations.db"
+    if not db_path.exists():
+        console.print("[yellow]Cache is already empty.[/yellow]")
+        raise typer.Exit(0)
+
+    size_kb = db_path.stat().st_size / 1024
+    db_path.unlink()
+    console.print(f"[green]Cache cleared.[/green] Removed {size_kb:.1f} KB from {db_path}")
 
 
 # Register commands from modules
