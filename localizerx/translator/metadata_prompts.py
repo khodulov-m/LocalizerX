@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from localizerx.parser.metadata_model import FIELD_LIMITS, MetadataFieldType
 from localizerx.utils.locale import get_fastlane_locale_name
 
@@ -176,6 +178,8 @@ def build_batch_metadata_prompt(
     """
     Build a batch translation prompt for multiple metadata fields.
 
+    Uses <<ITEM_N>> markers for reliable response parsing.
+
     Args:
         items: List of (field_type, text) tuples
         src_lang: Source language code
@@ -190,27 +194,47 @@ def build_batch_metadata_prompt(
     fields_text = []
     for i, (field_type, text) in enumerate(items, 1):
         limit = FIELD_LIMITS[field_type]
-        field_name = field_type.value.replace("_", " ")
+        field_name = field_type.value.replace("_", " ").upper()
         fields_text.append(
-            f"{i}. [{field_name.upper()}] (max {limit} chars):\n{text}"
+            f"<<ITEM_{i}>>\n[{field_name}] (max {limit} chars):\n{text}\n<</ITEM_{i}>>"
         )
 
     batch_text = "\n\n".join(fields_text)
     count = len(items)
-    header = f"Translate the following {count} App Store metadata fields"
 
-    prompt = f"""{header} from {src_name} to {tgt_name}.
+    prompt = f"""Translate the following {count} App Store metadata fields from {src_name} to {tgt_name}.
 
-IMPORTANT:
+IMPORTANT RULES:
 - Each field has a CHARACTER LIMIT that MUST be respected
 - Translate naturally, preserving the marketing tone
-- For KEYWORDS: Keep comma-separated format, no spaces after commas
-- Return translations numbered to match the input
+- For KEYWORDS: Keep comma-separated format exactly, same number of keywords, no spaces after commas
+- Return translations using the EXACT SAME <<ITEM_N>> markers
+- Do NOT include field labels like [NAME] in your response — only the translated text inside each marker
 
 Fields to translate:
 
 {batch_text}
 
-Translations (numbered to match, respecting character limits):"""
+Translations (output exactly {count} items using <<ITEM_1>> through <<ITEM_{count}>> markers, only the translated text inside each marker):"""
 
     return prompt
+
+
+def parse_batch_metadata_response(response: str, count: int) -> list[str]:
+    """
+    Parse batch metadata response using <<ITEM_N>> markers.
+
+    Args:
+        response: Raw API response string
+        count: Expected number of translations
+
+    Returns:
+        List of translated texts in order, empty string for missing items
+    """
+    results: list[str] = []
+    for i in range(1, count + 1):
+        pattern = rf"<<ITEM_{i}>>\s*(.*?)\s*<</ITEM_{i}>>"
+        match = re.search(pattern, response, re.DOTALL)
+        results.append(match.group(1).strip() if match else "")
+
+    return results
