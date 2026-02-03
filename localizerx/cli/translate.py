@@ -83,7 +83,7 @@ def translate(
             "-b",
             help="Create backup before writing changes",
         ),
-    ] = True,
+    ] = False,
     config_path: Annotated[
         Optional[Path],
         typer.Option(

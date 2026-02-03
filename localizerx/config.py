@@ -65,7 +65,7 @@ class Config(BaseModel):
     source_language: str = "en"
     default_targets: list[str] = Field(default_factory=lambda: DEFAULT_TARGET_LANGUAGES.copy())
     concurrency: int = Field(default=5, ge=1, le=20)
-    backup_enabled: bool = True
+    backup_enabled: bool = False
     cache_enabled: bool = True
     cache_dir: Path = DEFAULT_CACHE_DIR
     translator: TranslatorConfig = Field(default_factory=TranslatorConfig)
@@ -134,7 +134,7 @@ default_targets = [
 concurrency = 5
 
 # Create backup before writing changes
-backup_enabled = true
+backup_enabled = false
 
 # Enable translation caching
 cache_enabled = true

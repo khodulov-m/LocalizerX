@@ -83,11 +83,12 @@ def chrome(
             help="Overwrite existing translations",
         ),
     ] = False,
-    no_backup: Annotated[
+    backup: Annotated[
         bool,
         typer.Option(
-            "--no-backup",
-            help="Don't create backup before writing changes",
+            "--backup",
+            "-b",
+            help="Create backup before writing changes",
         ),
     ] = False,
     model: Annotated[
@@ -122,7 +123,7 @@ def chrome(
         dry_run=dry_run,
         preview=preview,
         overwrite=overwrite,
-        backup=not no_backup,
+        backup=backup,
         model=model,
     )
 

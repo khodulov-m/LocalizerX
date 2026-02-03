@@ -55,7 +55,7 @@ class TestConfig:
         config = Config()
         assert config.source_language == "en"
         assert config.concurrency == 5
-        assert config.backup_enabled is True
+        assert config.backup_enabled is False
         assert config.cache_enabled is True
 
     def test_config_default_targets(self):

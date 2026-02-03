@@ -77,7 +77,7 @@ def _read_locale_dir(locale_dir: Path, locale_code: str) -> LocaleMetadata:
 def write_metadata(
     catalog: MetadataCatalog,
     path: Path,
-    backup: bool = True,
+    backup: bool = False,
     locales: list[str] | None = None,
 ) -> None:
     """

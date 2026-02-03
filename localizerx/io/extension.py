@@ -83,7 +83,7 @@ def _read_messages_json(file_path: Path, locale_code: str) -> ExtensionLocale:
 def write_extension(
     catalog: ExtensionCatalog,
     path: Path,
-    backup: bool = True,
+    backup: bool = False,
     locales: list[str] | None = None,
 ) -> None:
     """

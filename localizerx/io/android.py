@@ -73,7 +73,7 @@ def read_android(path: Path, source_locale: str = "en") -> AndroidCatalog:
 def write_android(
     catalog: AndroidCatalog,
     path: Path,
-    backup: bool = True,
+    backup: bool = False,
     locales: list[str] | None = None,
 ) -> None:
     """

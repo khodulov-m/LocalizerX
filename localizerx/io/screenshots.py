@@ -102,7 +102,7 @@ def _parse_screen(data: dict[str, Any]) -> ScreenshotScreen:
 def write_screenshots(
     catalog: ScreenshotsCatalog,
     path: Path,
-    backup: bool = True,
+    backup: bool = False,
 ) -> None:
     """
     Write a ScreenshotsCatalog to a JSON file.

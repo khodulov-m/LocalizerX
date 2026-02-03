@@ -47,7 +47,7 @@ def read_i18n(path: Path, source_locale: str = "en") -> I18nCatalog:
 def write_i18n(
     catalog: I18nCatalog,
     path: Path,
-    backup: bool = True,
+    backup: bool = False,
     locales: list[str] | None = None,
 ) -> None:
     """

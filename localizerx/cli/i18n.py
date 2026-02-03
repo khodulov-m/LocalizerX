@@ -65,11 +65,12 @@ def i18n_translate(
             help="Overwrite existing translations",
         ),
     ] = False,
-    no_backup: Annotated[
+    backup: Annotated[
         bool,
         typer.Option(
-            "--no-backup",
-            help="Don't create backup before writing changes",
+            "--backup",
+            "-b",
+            help="Create backup before writing changes",
         ),
     ] = False,
     batch_size: Annotated[
@@ -102,7 +103,7 @@ def i18n_translate(
         dry_run=dry_run,
         preview=preview,
         overwrite=overwrite,
-        backup=not no_backup,
+        backup=backup,
         batch_size=batch_size,
         model=model,
     )
