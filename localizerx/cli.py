@@ -3511,16 +3511,21 @@ async def _translate_screenshots(
     """Perform screenshot text translations and update file."""
     from localizerx.io.screenshots import write_screenshots
     from localizerx.parser.screenshots_model import DeviceClass, ScreenshotTextType
-    from localizerx.translator.screenshots_prompts import build_screenshot_prompt
+    from localizerx.translator.screenshots_prompts import (
+        build_batch_screenshot_prompt,
+        build_screenshot_prompt,
+        parse_batch_screenshot_response,
+    )
 
     ss_cfg = config.translator.screenshots
     cache_dir = get_cache_dir(config)
     actual_model = model or ss_cfg.model
     thinking_config = {"thinkingLevel": ss_cfg.thinking_level}
 
+    batch_size = ss_cfg.batch_size
+
     async with GeminiTranslator(
         model=actual_model,
-        batch_size=1,  # Screenshot texts are short, translate one at a time
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,
         temperature=ss_cfg.temperature,
@@ -3533,6 +3538,20 @@ async def _translate_screenshots(
             console.print(f"  Translating to {get_language_name(target_lang)}...")
             all_translations[target_lang] = {}
 
+            # Resolve source texts, filtering out missing screens/variants
+            resolved: list[tuple[str, ScreenshotTextType, DeviceClass, str]] = []
+            for screen_id, text_type, device_class in items:
+                screen = catalog.screens.get(screen_id)
+                if not screen:
+                    continue
+                text_obj = screen.get_text(text_type)
+                if not text_obj:
+                    continue
+                source_text = text_obj.get_variant(device_class)
+                if not source_text:
+                    continue
+                resolved.append((screen_id, text_type, device_class, source_text))
+
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
@@ -3540,45 +3559,50 @@ async def _translate_screenshots(
                 TaskProgressColumn(),
                 console=console,
             ) as progress:
-                task = progress.add_task(f"    {target_lang}", total=len(items))
+                task = progress.add_task(f"    {target_lang}", total=len(resolved))
 
-                for screen_id, text_type, device_class in items:
-                    screen = catalog.screens.get(screen_id)
-                    if not screen:
-                        progress.advance(task)
-                        continue
-
-                    text_obj = screen.get_text(text_type)
-                    if not text_obj:
-                        progress.advance(task)
-                        continue
-
-                    source_text = text_obj.get_variant(device_class)
-                    if not source_text:
-                        progress.advance(task)
-                        continue
-
-                    # Build ASO-optimized prompt
-                    prompt = build_screenshot_prompt(
-                        text=source_text,
-                        text_type=text_type,
-                        device_class=device_class,
-                        src_lang=source_lang,
-                        tgt_lang=target_lang,
-                    )
+                for batch_start in range(0, len(resolved), batch_size):
+                    batch = resolved[batch_start : batch_start + batch_size]
 
                     try:
-                        translated = await translator._call_api(prompt)
-                        translated = translated.strip()
-                    except Exception as e:
-                        console.print(
-                            f"    [red]Error translating {screen_id}/{text_type.value}: {e}[/red]"
-                        )
-                        progress.advance(task)
-                        continue
+                        if len(batch) == 1:
+                            screen_id, text_type, device_class, source_text = batch[0]
+                            prompt = build_screenshot_prompt(
+                                text=source_text,
+                                text_type=text_type,
+                                device_class=device_class,
+                                src_lang=source_lang,
+                                tgt_lang=target_lang,
+                            )
+                            response = await translator._call_api(prompt)
+                            translations = [response.strip()]
+                        else:
+                            prompt = build_batch_screenshot_prompt(
+                                items=batch,
+                                src_lang=source_lang,
+                                tgt_lang=target_lang,
+                            )
+                            response = await translator._call_api(prompt)
+                            translations = parse_batch_screenshot_response(
+                                response, len(batch)
+                            )
 
-                    all_translations[target_lang][(screen_id, text_type, device_class)] = translated
-                    progress.advance(task)
+                        for (screen_id, text_type, device_class, _), translated in zip(
+                            batch, translations
+                        ):
+                            if translated:
+                                all_translations[target_lang][
+                                    (screen_id, text_type, device_class)
+                                ] = translated
+                    except Exception as e:
+                        items_str = ", ".join(
+                            f"{sid}/{tt.value}" for sid, tt, _, _ in batch
+                        )
+                        console.print(
+                            f"    [red]Error translating batch [{items_str}]: {e}[/red]"
+                        )
+
+                    progress.advance(task, advance=len(batch))
 
         # Show preview if requested
         if preview:

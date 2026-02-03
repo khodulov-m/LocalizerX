@@ -39,6 +39,7 @@ class ScreenshotsConfig(BaseModel):
     model: str = DEFAULT_SCREENSHOTS_MODEL
     temperature: float = Field(default=1.0, ge=0.0, le=2.0)
     thinking_level: str = Field(default="low")
+    batch_size: int = Field(default=50, ge=1, le=50)
 
 
 class TranslatorConfig(BaseModel):
@@ -156,6 +157,9 @@ temperature = 1.0
 
 # Thinking budget: "minimal", "low", "medium", "high"
 thinking_level = "low"
+
+# Number of screenshot texts per batch API call (1–50)
+batch_size = 50
 '''
 
     config_path.write_text(default_content)

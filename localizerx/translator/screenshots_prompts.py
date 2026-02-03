@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from localizerx.parser.screenshots_model import (
     SCREENSHOT_TEXT_WORD_LIMIT,
     DeviceClass,
@@ -149,3 +151,34 @@ Texts to adapt:
 Provide numbered translations. Each must be {SCREENSHOT_TEXT_WORD_LIMIT} words max:"""
 
     return prompt
+
+
+def parse_batch_screenshot_response(response: str, expected_count: int) -> list[str]:
+    """Parse numbered translations from a batch screenshot prompt response.
+
+    Handles common model response formats:
+    - "1. Text" / "1) Text"
+    - "1. [screen_1] [headline] [SHORT]: Text" (echoed input markers)
+    - "1. **Text**" (markdown bold)
+
+    Args:
+        response: Raw text response from the API
+        expected_count: Number of translations expected
+
+    Returns:
+        List of parsed translations, padded with empty strings if missing
+    """
+    results: list[str] = []
+    for i in range(1, expected_count + 1):
+        pattern = rf"^\s*{i}[\.\)]\s*(.+)"
+        match = re.search(pattern, response, re.MULTILINE)
+        if match:
+            text = match.group(1).strip()
+            # Strip echoed input markers like [screen_1] [headline] [SHORT]:
+            text = re.sub(r"^(?:\[[^\]]*\]\s*)+:?\s*", "", text)
+            # Strip markdown bold markers
+            text = text.replace("**", "")
+            results.append(text.strip())
+        else:
+            results.append("")
+    return results
