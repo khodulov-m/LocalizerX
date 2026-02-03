@@ -109,6 +109,16 @@ def translate(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    temperature: Annotated[
+        Optional[float],
+        typer.Option(
+            "--temperature",
+            "-T",
+            help="Sampling temperature (0.0–2.0). Lower = more deterministic.",
+            min=0.0,
+            max=2.0,
+        ),
+    ] = None,
 ) -> None:
     """Translate an .xcstrings file to target languages.
 
@@ -125,6 +135,7 @@ def translate(
         config_path=config_path,
         batch_size=batch_size,
         model=model,
+        temperature=temperature,
     )
 
 
@@ -139,6 +150,7 @@ def _run_translate(
     config_path: Path | None,
     batch_size: int | None,
     model: str | None,
+    temperature: float | None,
 ) -> None:
     """Core translation logic."""
     # Load configuration
@@ -215,6 +227,7 @@ def _run_translate(
             backup=backup,
             batch_size=batch_size,
             model=model,
+            temperature=temperature,
         )
 
 
@@ -290,6 +303,7 @@ def _process_file(
     backup: bool,
     batch_size: int | None,
     model: str | None,
+    temperature: float | None,
 ) -> None:
     """Process a single xcstrings file."""
     console.print(f"[bold]Processing:[/bold] {file_path}")
@@ -341,6 +355,7 @@ def _process_file(
             backup=backup,
             batch_size=batch_size,
             model=model,
+            temperature=temperature,
         )
     )
 
@@ -380,17 +395,20 @@ async def _translate_file(
     backup: bool,
     batch_size: int | None,
     model: str | None,
+    temperature: float | None,
 ) -> None:
     """Perform translations and update catalog."""
     cache_dir = get_cache_dir(config)
     actual_batch_size = batch_size or config.translator.batch_size
     actual_model = model or config.translator.model
+    actual_temperature = temperature if temperature is not None else config.translator.temperature
 
     async with GeminiTranslator(
         model=actual_model,
         batch_size=actual_batch_size,
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,
+        temperature=actual_temperature,
     ) as translator:
         all_translations: dict[str, dict[str, str]] = {}  # key -> {lang: translation}
 

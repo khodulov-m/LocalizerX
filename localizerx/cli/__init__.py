@@ -121,6 +121,16 @@ def main(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    temperature: Annotated[
+        Optional[float],
+        typer.Option(
+            "--temperature",
+            "-T",
+            help="Sampling temperature (0.0–2.0). Lower = more deterministic.",
+            min=0.0,
+            max=2.0,
+        ),
+    ] = None,
 ) -> None:
     """LocalizerX - Translate Xcode String Catalogs using Gemini API.
 
@@ -140,6 +150,7 @@ def main(
             config_path=config_path,
             batch_size=batch_size,
             model=model,
+            temperature=temperature,
         )
     elif ctx.invoked_subcommand is None:
         # No subcommand and no --to, show help

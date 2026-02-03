@@ -98,6 +98,16 @@ def metadata(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    temperature: Annotated[
+        Optional[float],
+        typer.Option(
+            "--temperature",
+            "-T",
+            help="Sampling temperature (0.0–2.0). Lower = more deterministic.",
+            min=0.0,
+            max=2.0,
+        ),
+    ] = None,
 ) -> None:
     """Translate fastlane App Store metadata to target locales."""
     # Validate on_limit option
@@ -121,6 +131,7 @@ def metadata(
         overwrite=overwrite,
         backup=not no_backup,
         model=model,
+        temperature=temperature,
     )
 
 
@@ -395,6 +406,7 @@ def _run_metadata_translate(
     overwrite: bool,
     backup: bool,
     model: str | None,
+    temperature: float | None,
 ) -> None:
     """Core metadata translation logic."""
     from localizerx.io.metadata import detect_metadata_path, read_metadata
@@ -513,6 +525,7 @@ def _run_metadata_translate(
             preview=preview,
             backup=backup,
             model=model,
+            temperature=temperature,
         )
     )
 
@@ -558,6 +571,7 @@ async def _translate_metadata(
     preview: bool,
     backup: bool,
     model: str | None,
+    temperature: float | None,
 ) -> None:
     """Perform metadata translations and update files."""
     from localizerx.io.metadata import write_metadata
@@ -570,6 +584,7 @@ async def _translate_metadata(
 
     cache_dir = get_cache_dir(config)
     actual_model = model or config.translator.model
+    actual_temperature = temperature if temperature is not None else config.translator.temperature
 
     source = catalog.get_source_metadata()
     if not source:
@@ -580,6 +595,7 @@ async def _translate_metadata(
         batch_size=1,  # Metadata fields are translated one at a time
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,
+        temperature=actual_temperature,
     ) as translator:
         all_translations: dict[str, dict[MetadataFieldType, str]] = {}
         limit_warnings: list[str] = []

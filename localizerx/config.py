@@ -47,6 +47,7 @@ class TranslatorConfig(BaseModel):
     model: str = DEFAULT_MODEL
     batch_size: int = Field(default=100, ge=1, le=100)
     max_retries: int = Field(default=3, ge=1, le=10)
+    temperature: float = Field(default=0.3, ge=0.0, le=2.0)
     screenshots: ScreenshotsConfig = Field(default_factory=ScreenshotsConfig)
 
 
@@ -148,6 +149,9 @@ model = "gemini-2.5-flash-lite"
 
 # Number of strings per API call
 batch_size = 100
+
+# Sampling temperature (0.0–2.0; lower = more deterministic)
+temperature = 0.3
 
 # Maximum retry attempts for failed requests
 max_retries = 3
