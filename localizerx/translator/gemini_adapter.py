@@ -272,10 +272,18 @@ Texts to translate:
 {batch_text}"""
 
         if contexts:
-            prompt += "\n\nContext notes (for your reference only, do NOT include in translations):\n"
+            prompt += (
+                "\n\nContext notes (for your reference only,"
+                " do NOT include in translations):\n"
+            )
             prompt += "\n".join(contexts)
 
-        prompt += f"\n\nTranslations (output exactly {count} items using <<ITEM_1>> through <<ITEM_{count}>> markers, one translation per marker, preserving all paragraphs within each item):"
+        prompt += (
+            f"\n\nTranslations (output exactly {count} items using"
+            f" <<ITEM_1>> through <<ITEM_{count}>> markers, one"
+            f" translation per marker, preserving all paragraphs"
+            f" within each item):"
+        )
         return prompt
 
     def _parse_batch_response(self, response: str, expected_count: int) -> list[str]:

@@ -1,13 +1,12 @@
 """Tests for screenshot text data models."""
 
-import pytest
 
 from localizerx.parser.screenshots_model import (
-    DeviceClass,
     SCREENSHOT_TEXT_WORD_LIMIT,
+    DeviceClass,
     ScreenshotLocale,
-    ScreenshotScreen,
     ScreenshotsCatalog,
+    ScreenshotScreen,
     ScreenshotText,
     ScreenshotTextType,
 )

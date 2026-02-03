@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -13,14 +12,11 @@ import pytest
 from localizerx.parser.extension_model import (
     EXTENSION_FIELD_LIMITS,
     KNOWN_CWS_KEYS,
-    ExtensionCatalog,
     ExtensionFieldType,
-    ExtensionLocale,
     ExtensionMessage,
 )
-from localizerx.translator.base import TranslationRequest, TranslationResult
+from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
-
 
 # ---------------------------------------------------------------------------
 # Helpers

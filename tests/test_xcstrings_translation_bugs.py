@@ -8,10 +8,11 @@ These tests reproduce the actual bugs found in examples/Localizable.xcstrings:
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from localizerx.translator.base import TranslationRequest, TranslationResult
+import pytest
+
+from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
 
 

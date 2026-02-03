@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
 if sys.version_info >= (3, 11):
@@ -53,7 +51,9 @@ class TranslatorConfig(BaseModel):
 
 
 DEFAULT_TARGET_LANGUAGES = [
-    "ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk", "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi"
+    "ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no",
+    "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk",
+    "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi",
 ]
 
 
@@ -121,7 +121,11 @@ source_language = "en"
 
 # Default target languages (used when --to is omitted)
 # Run: localizerx translate (without --to) to translate to all these languages
-default_targets = ["ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk", "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi"]
+default_targets = [
+    "ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no",
+    "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk",
+    "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi",
+]
 
 # Number of concurrent translation requests
 concurrency = 5

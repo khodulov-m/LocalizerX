@@ -15,9 +15,7 @@ from localizerx.io.screenshots import (
     write_screenshots,
 )
 from localizerx.parser.screenshots_model import (
-    DeviceClass,
     ScreenshotsCatalog,
-    ScreenshotScreen,
     ScreenshotText,
     ScreenshotTextType,
 )
@@ -293,8 +291,6 @@ class TestScreenshotsFileExists:
         assert not screenshots_file_exists(empty_dir / "nonexistent.json")
 
     def test_auto_detect_exists(self, sample_screenshots_file):
-        # Change working context to parent of screenshots dir
-        parent = sample_screenshots_file.parent.parent
         assert screenshots_file_exists() is False  # No auto-detect from cwd
 
 

@@ -71,7 +71,10 @@ class TestTruncateToLimit:
         assert len(result) == 30
 
     def test_keywords_truncation_at_comma(self):
-        keywords = "one,two,three,four,five,six,seven,eight,nine,ten,eleven,twelve,thirteen,fourteen,fifteen"
+        keywords = (
+            "one,two,three,four,five,six,seven,eight,"
+            "nine,ten,eleven,twelve,thirteen,fourteen,fifteen"
+        )
         result = truncate_to_limit(keywords, MetadataFieldType.KEYWORDS)
 
         # Should be within limit
@@ -181,7 +184,10 @@ class TestMetadataFieldLimits:
     def test_field_keywords_truncate_preserves_comma_boundary(self):
         from localizerx.parser.metadata_model import MetadataField
 
-        keywords = "keyword1,keyword2,keyword3,keyword4,keyword5,keyword6,keyword7,keyword8,keyword9,keyword10"
+        keywords = (
+            "keyword1,keyword2,keyword3,keyword4,keyword5,"
+            "keyword6,keyword7,keyword8,keyword9,keyword10"
+        )
         field = MetadataField(field_type=MetadataFieldType.KEYWORDS, content=keywords)
 
         truncated = field.truncate()

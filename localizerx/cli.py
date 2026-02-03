@@ -69,7 +69,10 @@ def main(
         typer.Option(
             "--to",
             "-t",
-            help="Target languages (comma-separated, e.g., 'fr,es,de'). Omit to use defaults from config.",
+            help=(
+                "Target languages (comma-separated, e.g., 'fr,es,de')."
+                " Omit to use defaults from config."
+            ),
         ),
     ] = None,
     src: Annotated[
@@ -174,7 +177,10 @@ def translate(
         typer.Option(
             "--to",
             "-t",
-            help="Target languages (comma-separated, e.g., 'fr,es,de'). Omit to use defaults from config.",
+            help=(
+                "Target languages (comma-separated, e.g., 'fr,es,de')."
+                " Omit to use defaults from config."
+            ),
         ),
     ] = None,
     src: Annotated[
@@ -698,7 +704,10 @@ def metadata(
         typer.Option(
             "--to",
             "-t",
-            help="Target locales (comma-separated, e.g., 'de-DE,fr-FR,es-ES'). Omit to use defaults from config.",
+            help=(
+                "Target locales (comma-separated, e.g., 'de-DE,fr-FR,es-ES')."
+                " Omit to use defaults from config."
+            ),
         ),
     ] = "",
     src: Annotated[
@@ -1044,7 +1053,8 @@ def metadata_check(
         console.print(violations_table)
         console.print()
         console.print(
-            "[yellow]Tip:[/yellow] Use --field to check a specific field or --locale to check a specific locale"
+            "[yellow]Tip:[/yellow] Use --field to check a specific field"
+            " or --locale to check a specific locale"
         )
         raise typer.Exit(1)
 
@@ -2736,7 +2746,10 @@ def screenshots_translate(
         typer.Option(
             "--to",
             "-t",
-            help="Target languages (comma-separated). If not specified, uses default_targets from config.",
+            help=(
+                "Target languages (comma-separated)."
+                " If not specified, uses default_targets from config."
+            ),
         ),
     ] = "",
     src: Annotated[
@@ -2815,7 +2828,6 @@ def screenshots_info(
     """Show information about screenshot texts file."""
     from localizerx.io.screenshots import detect_screenshots_path, read_screenshots
     from localizerx.parser.screenshots_model import (
-        DeviceClass,
         SCREENSHOT_TEXT_WORD_LIMIT,
     )
 
@@ -3012,14 +3024,11 @@ def _run_screenshots_generate(
         get_default_screenshots_path,
         read_hints_file,
         read_screenshots,
-        write_screenshots,
     )
     from localizerx.parser.app_context import AppContext
     from localizerx.parser.screenshots_model import (
         DeviceClass,
         ScreenshotsCatalog,
-        ScreenshotScreen,
-        ScreenshotText,
         ScreenshotTextType,
     )
 
@@ -3181,7 +3190,7 @@ def _interactive_screen_hints() -> dict[str, str]:
 
         # Prompt for description
         description = typer.prompt(
-            f"  Description (what does this screen show?)",
+            "  Description (what does this screen show?)",
             default="",
         )
 
@@ -3217,7 +3226,8 @@ def _show_generation_dry_run(
             user_hint=hint,
         )
 
-        console.print(f"[cyan]--- {screen_id} / {text_type.value} / {device_class.value} ---[/cyan]")
+        header = f"{screen_id} / {text_type.value} / {device_class.value}"
+        console.print(f"[cyan]--- {header} ---[/cyan]")
         # Show truncated prompt
         lines = prompt.split("\n")
         preview_lines = lines[:15]
@@ -3242,7 +3252,6 @@ async def _generate_screenshots(
 ) -> None:
     """Perform screenshot text generation and update file."""
     from localizerx.io.screenshots import write_screenshots
-    from localizerx.parser.screenshots_model import DeviceClass, ScreenshotTextType
     from localizerx.translator.screenshots_generation_prompts import build_generation_prompt
 
     ss_cfg = config.translator.screenshots
@@ -3382,7 +3391,7 @@ def _run_screenshots_translate(
 
         console.print(f"[green]Created screenshots template at {template_path}[/green]")
         console.print("\nEdit the file to add your screenshot texts, then run:")
-        console.print(f"  localizerx screenshots --to de,fr,es")
+        console.print("  localizerx screenshots --to de,fr,es")
         return
 
     # File exists, translate it
@@ -3423,7 +3432,6 @@ def _run_screenshots_translate(
     console.print()
 
     # Determine texts to translate per language
-    from localizerx.parser.screenshots_model import DeviceClass
 
     translation_tasks: dict[str, list] = {}  # lang -> [(screen_id, text_type, device_class)]
 

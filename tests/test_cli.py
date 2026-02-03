@@ -3,7 +3,7 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -198,7 +198,9 @@ class TestCLICommands:
         assert "Using default targets from config" in result.stdout
         assert f"{len(DEFAULT_TARGET_LANGUAGES)} languages" in result.stdout
 
-    def test_translate_without_to_shows_all_default_languages(self, temp_dir_with_xcstrings, monkeypatch):
+    def test_translate_without_to_shows_all_default_languages(
+        self, temp_dir_with_xcstrings, monkeypatch
+    ):
         """Test that translate without --to shows all default languages."""
         tmpdir, _ = temp_dir_with_xcstrings
         monkeypatch.chdir(tmpdir)
@@ -392,7 +394,7 @@ class TestDefaultTargets:
         monkeypatch.chdir(tmpdir)
         result = runner.invoke(app, ["translate", "--dry-run"])
         assert result.exit_code == 0
-        assert "14 languages" in result.stdout
+        assert f"{len(DEFAULT_TARGET_LANGUAGES)} languages" in result.stdout
 
     def test_translate_default_targets_dry_run_shows_languages(
         self, temp_dir_with_xcstrings, monkeypatch

@@ -271,7 +271,7 @@ class TestBatchRoundTrip:
 class TestScreenshotsConfigBatchSize:
     def test_default_batch_size(self):
         cfg = ScreenshotsConfig()
-        assert cfg.batch_size == 10
+        assert cfg.batch_size == 50
 
     def test_custom_batch_size(self):
         cfg = ScreenshotsConfig(batch_size=25)

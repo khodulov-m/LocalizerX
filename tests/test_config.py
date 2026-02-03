@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from localizerx.config import (
-    DEFAULT_CONFIG_PATH,
     DEFAULT_TARGET_LANGUAGES,
     Config,
     TranslatorConfig,
@@ -28,12 +27,16 @@ class TestDefaultTargetLanguages:
 
     def test_default_targets_contains_expected_languages(self):
         """Default targets should contain expected languages."""
-        expected = ["ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no", "de-DE", "nl", "ko", "da", "sv", "ro"]
+        expected = [
+            "ru", "fr", "pt-BR", "es-MX", "it", "ja", "pl", "no",
+            "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk",
+            "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi",
+        ]
         assert DEFAULT_TARGET_LANGUAGES == expected
 
     def test_default_targets_count(self):
-        """Default targets should have 14 languages."""
-        assert len(DEFAULT_TARGET_LANGUAGES) == 14
+        """Default targets should have 24 languages."""
+        assert len(DEFAULT_TARGET_LANGUAGES) == 24
 
     def test_default_targets_all_strings(self):
         """All default targets should be strings."""
