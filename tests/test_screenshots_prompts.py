@@ -220,6 +220,37 @@ class TestParseBatchScreenshotResponse:
         result = parse_batch_screenshot_response(response, 1)
         assert result == ["Bonjour"]
 
+    def test_bold_wrapped_markers_stripped(self):
+        # Model wraps the echoed marker block in **: **[…]:** text
+        response = (
+            "1. **[screen_1] [headline] [SHORT]:** Bonjour\n"
+            "2. **[screen_2] [subtitle] [NORMAL]:** Le monde"
+        )
+        result = parse_batch_screenshot_response(response, 2)
+        assert result == ["Bonjour", "Le monde"]
+
+    def test_bold_wrapped_entire_item_stripped(self):
+        # Model wraps the whole line in bold: **[…]: text**
+        response = "1. **[screen_1] [headline] [SHORT]: Bonjour**"
+        result = parse_batch_screenshot_response(response, 1)
+        assert result == ["Bonjour"]
+
+    def test_mixed_bold_and_plain_markers(self):
+        # Some items have bold-wrapped markers, others don't — the reported bug pattern
+        response = (
+            "1. **[main_screen] [headline] [SHORT]:** Éditez par chat\n"
+            "2. [main_screen] [headline] [NORMAL]: Transformez les photos\n"
+            "3. **[private_gallery] [headline] [SHORT]:** Studio privé"
+        )
+        result = parse_batch_screenshot_response(response, 3)
+        assert result == ["Éditez par chat", "Transformez les photos", "Studio privé"]
+
+    def test_individual_markers_each_bold_wrapped(self):
+        # Each bracket group wrapped in bold separately
+        response = "1. **[screen_1]** **[headline]** **[SHORT]**: Bonjour"
+        result = parse_batch_screenshot_response(response, 1)
+        assert result == ["Bonjour"]
+
 
 class TestBatchRoundTrip:
     """Verify prompt/parse contract with simulated model responses."""
@@ -266,6 +297,31 @@ class TestBatchRoundTrip:
         )
         parsed = parse_batch_screenshot_response(simulated, 2)
         assert parsed == ["Hallo", "Entdecken"]
+
+    def test_bold_wrapped_markers_roundtrip(self):
+        """Reproduces the reported bug: markers left in output when model wraps them in bold."""
+        items = [
+            ("main_screen", ScreenshotTextType.HEADLINE, DeviceClass.SMALL, "Edit by chat"),
+            ("main_screen", ScreenshotTextType.HEADLINE, DeviceClass.LARGE, "Transform photos"),
+            ("private_gallery", ScreenshotTextType.HEADLINE, DeviceClass.SMALL, "Private art"),
+            ("private_gallery", ScreenshotTextType.HEADLINE, DeviceClass.LARGE, "Your portfolio"),
+        ]
+        build_batch_screenshot_prompt(items, "en", "fr")
+
+        # Simulates the exact LLM response that triggered the bug
+        simulated = (
+            "1. **[main_screen] [headline] [SHORT]:** Éditez par simple chat\n"
+            "2. **[main_screen] [headline] [NORMAL]:** Transformez vos photos par chat\n"
+            "3. **[private_gallery] [headline] [SHORT]:** Studio d'art IA privé\n"
+            "4. **[private_gallery] [headline] [NORMAL]:** Votre portfolio d'art IA"
+        )
+        parsed = parse_batch_screenshot_response(simulated, 4)
+        assert parsed == [
+            "Éditez par simple chat",
+            "Transformez vos photos par chat",
+            "Studio d'art IA privé",
+            "Votre portfolio d'art IA",
+        ]
 
 
 class TestScreenshotsConfigBatchSize:

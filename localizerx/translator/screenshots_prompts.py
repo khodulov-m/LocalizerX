@@ -174,10 +174,11 @@ def parse_batch_screenshot_response(response: str, expected_count: int) -> list[
         match = re.search(pattern, response, re.MULTILINE)
         if match:
             text = match.group(1).strip()
+            # Strip markdown bold markers first — they may wrap echoed input markers,
+            # blocking the bracket regex if left in place
+            text = text.replace("**", "")
             # Strip echoed input markers like [screen_1] [headline] [SHORT]:
             text = re.sub(r"^(?:\[[^\]]*\]\s*)+:?\s*", "", text)
-            # Strip markdown bold markers
-            text = text.replace("**", "")
             results.append(text.strip())
         else:
             results.append("")
