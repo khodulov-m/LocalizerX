@@ -179,9 +179,9 @@ localizerx metadata --to de-DE --on-limit truncate
 | `--model` | `-m` | Gemini model to use |
 | `--temperature` | `-T` | Sampling temperature (0.0–2.0). Lower = more deterministic. |
 
-### Check Metadata Character Limits
+### Check Metadata Character Limits & ASO Optimization
 
-Validate that your App Store metadata fields comply with Apple's character limits:
+Validate that your App Store metadata fields comply with Apple's character limits and check for ASO optimization issues:
 
 ```bash
 # Check all fields in all locales
@@ -198,6 +198,9 @@ localizerx metadata-check --locale en-US --field name
 
 # Specify metadata directory
 localizerx metadata-check ./fastlane/metadata
+
+# Skip duplicate word check (only check character limits)
+localizerx metadata-check --skip-duplicates
 ```
 
 **Character Limits:**
@@ -208,9 +211,30 @@ localizerx metadata-check ./fastlane/metadata
 - Promotional text: 170 characters
 - Release notes: 4,000 characters
 
+**ASO Optimization - Duplicate Word Detection:**
+
+The command also checks for duplicate words between `name`, `subtitle`, and `keywords` fields. Apple indexes words from all three fields, so repeating the same word wastes valuable character space.
+
+Example output:
+```
+✓ All fields are within character limits
+
+⚠ Found 2 duplicate word issue(s) (ASO optimization)
+
+           Duplicate Words (ASO)
+┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
+┃ Locale       ┃ Fields              ┃ Duplicated Words ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
+│ en-US        │ name → keywords     │ photo, editor    │
+│ en-US        │ subtitle → keywords │ photo            │
+└──────────────┴─────────────────────┴──────────────────┘
+```
+
+Common stop words (a, the, and, etc.) are automatically excluded from duplicate detection.
+
 **Exit Codes:**
-- `0` - All fields are within limits
-- `1` - One or more fields exceed limits (useful for CI/CD)
+- `0` - All fields are within limits (duplicate warnings don't affect exit code)
+- `1` - One or more fields exceed character limits (useful for CI/CD)
 
 ### Metadata Check Options
 
@@ -218,6 +242,7 @@ localizerx metadata-check ./fastlane/metadata
 |--------|-------|-------------|
 | `--locale` | `-l` | Check specific locale only (default: all locales) |
 | `--field` | `-f` | Check specific field only (e.g., `name`, `subtitle`, `keywords`) |
+| `--skip-duplicates` | | Skip duplicate word check between name/subtitle/keywords |
 
 ### Translate App Store Screenshot Texts
 

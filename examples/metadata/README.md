@@ -60,6 +60,19 @@ localizerx metadata examples/metadata --to de-DE --on-limit truncate
 localizerx metadata examples/metadata --to de-DE --on-limit error
 ```
 
+### Check character limits and ASO optimization
+
+```bash
+# Check all locales for limit violations and duplicate words
+localizerx metadata-check examples/metadata
+
+# Check specific locale
+localizerx metadata-check examples/metadata --locale en-US
+
+# Skip duplicate word detection (only check character limits)
+localizerx metadata-check examples/metadata --skip-duplicates
+```
+
 ### View metadata info
 
 ```bash

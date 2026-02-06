@@ -266,11 +266,33 @@ class TestMetadataCheckCommand:
     """Tests for metadata-check command."""
 
     def test_metadata_check_all_valid(self, sample_metadata_dir):
-        """Test metadata-check when all fields are valid."""
-        result = runner.invoke(app, ["metadata-check", str(sample_metadata_dir)])
+        """Test metadata-check when all fields are valid (skip duplicates check)."""
+        result = runner.invoke(
+            app, ["metadata-check", str(sample_metadata_dir), "--skip-duplicates"]
+        )
         assert result.exit_code == 0
         assert "All fields are within character limits" in result.stdout
         assert "Character Limit Summary" in result.stdout
+
+    def test_metadata_check_duplicate_words(self, sample_metadata_dir):
+        """Test metadata-check detects duplicate words between name/subtitle/keywords."""
+        result = runner.invoke(app, ["metadata-check", str(sample_metadata_dir)])
+        assert result.exit_code == 0  # Duplicates are warnings, not errors
+        assert "All fields are within character limits" in result.stdout
+        assert "duplicate word issue" in result.stdout
+        assert "Duplicate Words (ASO)" in result.stdout
+        # The test data has "Awesome App" in name, "Best App" in subtitle,
+        # and "awesome,app,test" in keywords - so "app" and "awesome" should be duplicates
+        assert "app" in result.stdout.lower()
+
+    def test_metadata_check_skip_duplicates(self, sample_metadata_dir):
+        """Test metadata-check --skip-duplicates flag."""
+        result = runner.invoke(
+            app, ["metadata-check", str(sample_metadata_dir), "--skip-duplicates"]
+        )
+        assert result.exit_code == 0
+        assert "Duplicate word check skipped" in result.stdout
+        assert "Duplicate Words (ASO)" not in result.stdout
 
     def test_metadata_check_with_violations(self, metadata_with_overlimit):
         """Test metadata-check when fields exceed limits."""

@@ -9,6 +9,8 @@ from typing import Annotated, Optional
 import typer
 from rich.table import Table
 
+import re
+
 from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.gemini_adapter import GeminiTranslator
@@ -17,6 +19,97 @@ from localizerx.utils.locale import (
     parse_fastlane_locale_list,
     validate_fastlane_locale,
 )
+
+# Common stop words to ignore in duplicate detection (short words with little SEO value)
+_STOP_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "but",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "as",
+        "is",
+        "was",
+        "are",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "it",
+        "its",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "we",
+        "they",
+        "my",
+        "your",
+        "his",
+        "her",
+        "our",
+        "their",
+        "&",
+        "-",
+        "—",
+        "+",
+    }
+)
+
+
+def _extract_words(text: str) -> set[str]:
+    """Extract significant words from text for duplicate detection.
+
+    Normalizes to lowercase and filters out stop words and short words.
+    """
+    # Split on non-alphanumeric characters (handles both spaces and commas)
+    words = re.split(r"[^a-zA-Z0-9]+", text.lower())
+    # Filter: non-empty, not a stop word, at least 2 characters
+    return {w for w in words if w and w not in _STOP_WORDS and len(w) >= 2}
+
+
+def _extract_keywords(keywords_text: str) -> set[str]:
+    """Extract individual keywords from comma-separated keywords string.
+
+    Returns both full keyword phrases and individual words within them.
+    """
+    words = set()
+    for keyword in keywords_text.split(","):
+        keyword = keyword.strip().lower()
+        if keyword:
+            # Add individual words from the keyword phrase
+            words.update(_extract_words(keyword))
+    return words
 
 
 def metadata(
@@ -260,8 +353,15 @@ def metadata_check(
             help="Check specific field only (e.g., name, subtitle, keywords)",
         ),
     ] = None,
+    skip_duplicates: Annotated[
+        bool,
+        typer.Option(
+            "--skip-duplicates",
+            help="Skip duplicate word check between name/subtitle/keywords",
+        ),
+    ] = False,
 ) -> None:
-    """Check metadata files for App Store character limit compliance."""
+    """Check metadata files for App Store character limit compliance and ASO optimization."""
     from localizerx.io.metadata import detect_metadata_path, read_metadata
     from localizerx.parser.metadata_model import MetadataFieldType
     from localizerx.utils.limits import validate_limit
@@ -285,9 +385,7 @@ def metadata_check(
             field_type_filter = MetadataFieldType(field.lower())
         except ValueError:
             console.print(f"[red]Error:[/red] Invalid field type: {field}")
-            console.print(
-                f"Valid fields: {', '.join(f.value for f in MetadataFieldType)}"
-            )
+            console.print(f"Valid fields: {', '.join(f.value for f in MetadataFieldType)}")
             raise typer.Exit(1)
 
     # Read metadata
@@ -339,34 +437,69 @@ def metadata_check(
                     }
                 )
 
+    # Check for duplicate words between name/subtitle/keywords (ASO optimization)
+    duplicates: list[dict] = []
+    if not skip_duplicates:
+        for locale_code in sorted(locales_to_check):
+            locale_meta = catalog.locales[locale_code]
+            locale_name = get_fastlane_locale_name(locale_code)
+
+            # Get content from ASO-critical fields
+            name_field = locale_meta.get_field(MetadataFieldType.NAME)
+            subtitle_field = locale_meta.get_field(MetadataFieldType.SUBTITLE)
+            keywords_field = locale_meta.get_field(MetadataFieldType.KEYWORDS)
+
+            name_words = _extract_words(name_field.content) if name_field else set()
+            subtitle_words = _extract_words(subtitle_field.content) if subtitle_field else set()
+            keywords_words = _extract_keywords(keywords_field.content) if keywords_field else set()
+
+            # Find duplicates between fields
+            name_in_keywords = name_words & keywords_words
+            subtitle_in_keywords = subtitle_words & keywords_words
+            name_in_subtitle = name_words & subtitle_words
+
+            if name_in_keywords:
+                duplicates.append(
+                    {
+                        "locale": locale_code,
+                        "locale_name": locale_name,
+                        "fields": "name → keywords",
+                        "words": sorted(name_in_keywords),
+                    }
+                )
+            if subtitle_in_keywords:
+                duplicates.append(
+                    {
+                        "locale": locale_code,
+                        "locale_name": locale_name,
+                        "fields": "subtitle → keywords",
+                        "words": sorted(subtitle_in_keywords),
+                    }
+                )
+            if name_in_subtitle:
+                duplicates.append(
+                    {
+                        "locale": locale_code,
+                        "locale_name": locale_name,
+                        "fields": "name → subtitle",
+                        "words": sorted(name_in_subtitle),
+                    }
+                )
+
     # Display results
     console.print(f"[bold]Metadata Directory:[/bold] {path}")
     console.print(f"[bold]Locales Checked:[/bold] {len(locales_to_check)}")
     console.print(f"[bold]Fields Checked:[/bold] {field or 'all'}")
     console.print()
 
+    has_issues = False
+
+    # Character limit results
     if all_valid:
         console.print("[green]✓ All fields are within character limits[/green]")
-        console.print()
-
-        # Show summary table
-        summary_table = Table(title="Character Limit Summary")
-        summary_table.add_column("Field", style="cyan")
-        summary_table.add_column("Limit", style="white")
-
-        field_types_to_show = (
-            [field_type_filter] if field_type_filter else list(MetadataFieldType)
-        )
-        for ft in field_types_to_show:
-            from localizerx.parser.metadata_model import FIELD_LIMITS
-
-            summary_table.add_row(ft.value, str(FIELD_LIMITS[ft]))
-
-        console.print(summary_table)
     else:
-        console.print(
-            f"[red]✗ Found {len(violations)} field(s) exceeding character limits[/red]"
-        )
+        has_issues = True
+        console.print(f"[red]✗ Found {len(violations)} field(s) exceeding character limits[/red]")
         console.print()
 
         # Show violations table
@@ -388,6 +521,58 @@ def metadata_check(
             )
 
         console.print(violations_table)
+
+    # Duplicate word results (ASO optimization)
+    console.print()
+    if skip_duplicates:
+        console.print("[dim]Duplicate word check skipped (--skip-duplicates)[/dim]")
+    elif not duplicates:
+        console.print("[green]✓ No duplicate words between name/subtitle/keywords[/green]")
+    else:
+        console.print(
+            f"[yellow]⚠ Found {len(duplicates)} duplicate word issue(s) (ASO optimization)[/yellow]"
+        )
+        console.print()
+
+        # Show duplicates table
+        duplicates_table = Table(title="Duplicate Words (ASO)")
+        duplicates_table.add_column("Locale", style="cyan")
+        duplicates_table.add_column("Fields", style="yellow")
+        duplicates_table.add_column("Duplicated Words", style="magenta")
+
+        for d in duplicates:
+            words_str = ", ".join(d["words"])
+            duplicates_table.add_row(
+                f"{d['locale']}\n{d['locale_name']}",
+                d["fields"],
+                words_str,
+            )
+
+        console.print(duplicates_table)
+        console.print()
+        console.print(
+            "[yellow]Tip:[/yellow] Apple indexes words from name, subtitle, and keywords."
+        )
+        console.print("      Repeating words wastes valuable character space.")
+        console.print("      Use --skip-duplicates to disable this check.")
+
+    # Summary
+    console.print()
+    if not has_issues and not duplicates:
+        # Show summary table
+        summary_table = Table(title="Character Limit Summary")
+        summary_table.add_column("Field", style="cyan")
+        summary_table.add_column("Limit", style="white")
+
+        field_types_to_show = [field_type_filter] if field_type_filter else list(MetadataFieldType)
+        for ft in field_types_to_show:
+            from localizerx.parser.metadata_model import FIELD_LIMITS
+
+            summary_table.add_row(ft.value, str(FIELD_LIMITS[ft]))
+
+        console.print(summary_table)
+
+    if has_issues:
         console.print()
         console.print(
             "[yellow]Tip:[/yellow] Use --field to check a specific field"
@@ -627,9 +812,7 @@ async def _translate_metadata(
                     if ft == MetadataFieldType.KEYWORDS:
                         prompt = build_keywords_prompt(text, source_locale, target_locale)
                     else:
-                        prompt = build_metadata_prompt(
-                            text, ft, source_locale, target_locale
-                        )
+                        prompt = build_metadata_prompt(text, ft, source_locale, target_locale)
                     response = await translator._call_api(prompt)
                     return target_locale, {ft: response.strip()}
 
@@ -656,10 +839,7 @@ async def _translate_metadata(
                     progress.advance(progress_task)
 
             results = await asyncio.gather(
-                *[
-                    _with_progress(loc, fields)
-                    for loc, fields in translation_tasks.items()
-                ],
+                *[_with_progress(loc, fields) for loc, fields in translation_tasks.items()],
                 return_exceptions=True,
             )
 
