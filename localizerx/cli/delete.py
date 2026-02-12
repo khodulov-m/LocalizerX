@@ -52,3 +52,37 @@ def _determine_languages_to_delete(
         return existing_langs - keep_langs
 
     return set()
+
+
+def _delete_languages_from_catalog(
+    catalog: StringCatalog,
+    languages: set[str],
+) -> dict[str, int]:
+    """Delete languages from catalog.
+
+    Args:
+        catalog: The string catalog
+        languages: Set of language codes to delete
+
+    Returns:
+        Dict mapping language code to count of deleted translations
+    """
+    deleted_counts = {lang: 0 for lang in languages}
+
+    # Delete from entries
+    for entry in catalog.strings.values():
+        for lang in languages:
+            if lang in entry.translations:
+                del entry.translations[lang]
+                deleted_counts[lang] += 1
+
+    # Delete from raw_data for lossless write
+    raw_data = catalog.get_raw_data()
+    if raw_data and "strings" in raw_data:
+        for key, entry_data in raw_data["strings"].items():
+            if "localizations" in entry_data:
+                locs = entry_data["localizations"]
+                for lang in languages:
+                    locs.pop(lang, None)
+
+    return deleted_counts

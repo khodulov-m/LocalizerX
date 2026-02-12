@@ -19,7 +19,7 @@ def catalog_with_multiple_languages():
                     "de": Translation(value="Hallo"),
                     "es": Translation(value="Hola"),
                     "ru": Translation(value="Привет"),
-                }
+                },
             ),
             "goodbye": Entry(
                 key="goodbye",
@@ -29,35 +29,37 @@ def catalog_with_multiple_languages():
                     "de": Translation(value="Auf Wiedersehen"),
                     "es": Translation(value="Adiós"),
                     "ru": Translation(value="До свидания"),
-                }
+                },
             ),
-        }
+        },
     )
     # Set raw data to simulate file read
-    catalog.set_raw_data({
-        "sourceLanguage": "en",
-        "version": "1.0",
-        "strings": {
-            "hello": {
-                "localizations": {
-                    "en": {"stringUnit": {"state": "translated", "value": "Hello"}},
-                    "fr": {"stringUnit": {"state": "translated", "value": "Bonjour"}},
-                    "de": {"stringUnit": {"state": "translated", "value": "Hallo"}},
-                    "es": {"stringUnit": {"state": "translated", "value": "Hola"}},
-                    "ru": {"stringUnit": {"state": "translated", "value": "Привет"}},
-                }
+    catalog.set_raw_data(
+        {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "hello": {
+                    "localizations": {
+                        "en": {"stringUnit": {"state": "translated", "value": "Hello"}},
+                        "fr": {"stringUnit": {"state": "translated", "value": "Bonjour"}},
+                        "de": {"stringUnit": {"state": "translated", "value": "Hallo"}},
+                        "es": {"stringUnit": {"state": "translated", "value": "Hola"}},
+                        "ru": {"stringUnit": {"state": "translated", "value": "Привет"}},
+                    }
+                },
+                "goodbye": {
+                    "localizations": {
+                        "en": {"stringUnit": {"state": "translated", "value": "Goodbye"}},
+                        "fr": {"stringUnit": {"state": "translated", "value": "Au revoir"}},
+                        "de": {"stringUnit": {"state": "translated", "value": "Auf Wiedersehen"}},
+                        "es": {"stringUnit": {"state": "translated", "value": "Adiós"}},
+                        "ru": {"stringUnit": {"state": "translated", "value": "До свидания"}},
+                    }
+                },
             },
-            "goodbye": {
-                "localizations": {
-                    "en": {"stringUnit": {"state": "translated", "value": "Goodbye"}},
-                    "fr": {"stringUnit": {"state": "translated", "value": "Au revoir"}},
-                    "de": {"stringUnit": {"state": "translated", "value": "Auf Wiedersehen"}},
-                    "es": {"stringUnit": {"state": "translated", "value": "Adiós"}},
-                    "ru": {"stringUnit": {"state": "translated", "value": "До свидания"}},
-                }
-            }
         }
-    })
+    )
     return catalog
 
 
@@ -124,3 +126,42 @@ class TestDetermineLanguagesToDelete:
 
         assert "en" not in langs_to_delete
         assert "fr" in langs_to_delete
+
+
+class TestDeleteLanguagesFromCatalog:
+    def test_delete_languages_from_entries(self, catalog_with_multiple_languages):
+        """Test deleting languages from catalog entries."""
+        from localizerx.cli.delete import _delete_languages_from_catalog
+
+        langs_to_delete = {"fr", "de"}
+        deleted_counts = _delete_languages_from_catalog(
+            catalog_with_multiple_languages, langs_to_delete
+        )
+
+        # Check counts
+        assert deleted_counts == {"fr": 2, "de": 2}  # 2 strings each
+
+        # Check that languages were removed
+        for entry in catalog_with_multiple_languages.strings.values():
+            assert "fr" not in entry.translations
+            assert "de" not in entry.translations
+            assert "es" in entry.translations  # Not deleted
+            assert "ru" in entry.translations  # Not deleted
+
+    def test_delete_languages_from_raw_data(self, catalog_with_multiple_languages):
+        """Test deleting languages from raw_data for lossless write."""
+        from localizerx.cli.delete import _delete_languages_from_catalog
+
+        langs_to_delete = {"fr", "de"}
+        _delete_languages_from_catalog(catalog_with_multiple_languages, langs_to_delete)
+
+        # Check raw_data
+        raw_data = catalog_with_multiple_languages.get_raw_data()
+        assert raw_data is not None
+
+        for key, entry_data in raw_data["strings"].items():
+            locs = entry_data["localizations"]
+            assert "fr" not in locs
+            assert "de" not in locs
+            assert "es" in locs
+            assert "ru" in locs
