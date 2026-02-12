@@ -100,7 +100,8 @@ def delete(
     languages: Annotated[
         Optional[str],
         typer.Argument(
-            help="Languages to delete (comma-separated, e.g., 'fr,es,de'). Use --all to delete all except source.",
+            help="Languages to delete (comma-separated, e.g., 'fr,es,de'). "
+            "Use --all to delete all except source.",
         ),
     ] = None,
     path: Annotated[
@@ -180,7 +181,9 @@ def _run_delete(
     if delete_all and languages and not path:
         # Check if languages looks like actual language codes (not a path)
         potential_path = Path(languages)
-        is_path_like = potential_path.exists() or languages.endswith('.xcstrings') or '/' in languages
+        is_path_like = (
+            potential_path.exists() or languages.endswith(".xcstrings") or "/" in languages
+        )
         if not is_path_like:
             console.print("[red]Error:[/red] Cannot use --all with specific languages")
             raise typer.Exit(1)
@@ -194,7 +197,7 @@ def _run_delete(
     if delete_all and languages and not path:
         # Check if languages looks like a path
         potential_path = Path(languages)
-        if potential_path.exists() or languages.endswith('.xcstrings') or '/' in languages:
+        if potential_path.exists() or languages.endswith(".xcstrings") or "/" in languages:
             path = potential_path
             languages = None
 
@@ -310,7 +313,10 @@ def _process_file(
 
     # Read file
     catalog = read_xcstrings(file_path)
-    console.print(f"  Source language: {get_language_name(catalog.source_language)} ({catalog.source_language})")
+    console.print(
+        f"  Source language: {get_language_name(catalog.source_language)} "
+        f"({catalog.source_language})"
+    )
     console.print(f"  Total strings: {len(catalog.strings)}")
 
     # Determine which languages to delete
@@ -364,7 +370,7 @@ def _show_deletion_table(catalog: StringCatalog, langs_to_delete: set[str]) -> N
                 lang_counts[lang] += 1
 
     # Add rows sorted by language name
-    for lang in sorted(langs_to_delete, key=lambda l: get_language_name(l)):
+    for lang in sorted(langs_to_delete, key=lambda lang_code: get_language_name(lang_code)):
         table.add_row(
             get_language_name(lang),
             lang,

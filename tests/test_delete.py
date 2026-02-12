@@ -193,8 +193,8 @@ class TestDeleteIntegration:
                         "de": {"stringUnit": {"state": "translated", "value": "Auf Wiedersehen"}},
                         "es": {"stringUnit": {"state": "translated", "value": "Adiós"}},
                     }
-                }
-            }
+                },
+            },
         }
 
         with open(test_file, "w") as f:
@@ -243,7 +243,7 @@ class TestDeleteIntegration:
                         "de": {"stringUnit": {"state": "translated", "value": "Hallo"}},
                     }
                 }
-            }
+            },
         }
 
         with open(test_file, "w") as f:
@@ -279,7 +279,7 @@ class TestDeleteIntegration:
                         "fr": {"stringUnit": {"state": "translated", "value": "Bonjour"}},
                     }
                 }
-            }
+            },
         }
 
         with open(test_file, "w") as f:
