@@ -1,5 +1,7 @@
 """Tests for delete command."""
 
+import json
+
 import pytest
 
 from localizerx.parser.model import Entry, StringCatalog, Translation
@@ -165,3 +167,141 @@ class TestDeleteLanguagesFromCatalog:
             assert "de" not in locs
             assert "es" in locs
             assert "ru" in locs
+
+
+class TestDeleteIntegration:
+    def test_delete_specific_languages_from_file(self, tmp_path):
+        """Test deleting specific languages from a real file."""
+        # Create test file
+        test_file = tmp_path / "test.xcstrings"
+        data = {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "hello": {
+                    "localizations": {
+                        "en": {"stringUnit": {"state": "translated", "value": "Hello"}},
+                        "fr": {"stringUnit": {"state": "translated", "value": "Bonjour"}},
+                        "de": {"stringUnit": {"state": "translated", "value": "Hallo"}},
+                        "es": {"stringUnit": {"state": "translated", "value": "Hola"}},
+                    }
+                },
+                "goodbye": {
+                    "localizations": {
+                        "en": {"stringUnit": {"state": "translated", "value": "Goodbye"}},
+                        "fr": {"stringUnit": {"state": "translated", "value": "Au revoir"}},
+                        "de": {"stringUnit": {"state": "translated", "value": "Auf Wiedersehen"}},
+                        "es": {"stringUnit": {"state": "translated", "value": "Adiós"}},
+                    }
+                }
+            }
+        }
+
+        with open(test_file, "w") as f:
+            json.dump(data, f, indent=2)
+
+        # Read, delete, write
+        from localizerx.cli.delete import _process_file
+        from localizerx.io.xcstrings import read_xcstrings
+
+        _process_file(
+            file_path=test_file,
+            languages="fr,de",
+            delete_all=False,
+            keep=False,
+            yes=True,
+            backup=False,
+        )
+
+        # Verify languages were deleted
+        catalog = read_xcstrings(test_file)
+        for entry in catalog.strings.values():
+            assert "fr" not in entry.translations
+            assert "de" not in entry.translations
+            assert "es" in entry.translations
+
+        # Verify JSON structure preserved
+        with open(test_file) as f:
+            result = json.load(f)
+
+        assert result["sourceLanguage"] == "en"
+        assert result["version"] == "1.0"
+        assert "hello" in result["strings"]
+        assert "goodbye" in result["strings"]
+
+    def test_delete_all_except_source(self, tmp_path):
+        """Test --all mode."""
+        test_file = tmp_path / "test.xcstrings"
+        data = {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "hello": {
+                    "localizations": {
+                        "en": {"stringUnit": {"state": "translated", "value": "Hello"}},
+                        "fr": {"stringUnit": {"state": "translated", "value": "Bonjour"}},
+                        "de": {"stringUnit": {"state": "translated", "value": "Hallo"}},
+                    }
+                }
+            }
+        }
+
+        with open(test_file, "w") as f:
+            json.dump(data, f, indent=2)
+
+        from localizerx.cli.delete import _process_file
+        from localizerx.io.xcstrings import read_xcstrings
+
+        _process_file(
+            file_path=test_file,
+            languages=None,
+            delete_all=True,
+            keep=False,
+            yes=True,
+            backup=False,
+        )
+
+        # Verify all languages deleted except source
+        catalog = read_xcstrings(test_file)
+        for entry in catalog.strings.values():
+            assert len(entry.translations) == 0
+
+    def test_delete_with_backup(self, tmp_path):
+        """Test backup functionality."""
+        test_file = tmp_path / "test.xcstrings"
+        data = {
+            "sourceLanguage": "en",
+            "version": "1.0",
+            "strings": {
+                "hello": {
+                    "localizations": {
+                        "en": {"stringUnit": {"state": "translated", "value": "Hello"}},
+                        "fr": {"stringUnit": {"state": "translated", "value": "Bonjour"}},
+                    }
+                }
+            }
+        }
+
+        with open(test_file, "w") as f:
+            json.dump(data, f, indent=2)
+
+        from localizerx.cli.delete import _process_file
+
+        _process_file(
+            file_path=test_file,
+            languages="fr",
+            delete_all=False,
+            keep=False,
+            yes=True,
+            backup=True,
+        )
+
+        # Verify backup was created
+        backup_file = test_file.with_suffix(".xcstrings.backup")
+        assert backup_file.exists()
+
+        # Verify backup contains original data
+        with open(backup_file) as f:
+            backup_data = json.load(f)
+
+        assert "fr" in backup_data["strings"]["hello"]["localizations"]
