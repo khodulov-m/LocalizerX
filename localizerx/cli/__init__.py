@@ -29,6 +29,7 @@ app = typer.Typer(
 from localizerx.cli import (  # noqa: E402
     android,
     chrome,
+    delete,
     i18n,
     metadata,
     screenshots,
@@ -235,6 +236,7 @@ def cache_clear(
 # Register commands from modules
 app.command()(translate.translate)
 app.command()(translate.info)
+app.command()(delete.delete)
 app.command()(metadata.metadata)
 app.command("metadata-info")(metadata.metadata_info)
 app.command("metadata-check")(metadata.metadata_check)
