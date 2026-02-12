@@ -43,14 +43,18 @@ def _parse_entry(key: str, data: dict[str, Any], source_language: str) -> Entry:
     extraction_state = data.get("extractionState")
     should_translate = data.get("shouldTranslate", True)
 
-    # Get source text from the source language localization or the key itself
+    # Get source text and variations from the source language localization
     localizations = data.get("localizations", {})
     source_text = key  # Default to key
+    source_variations = None
 
     if source_language in localizations:
         source_loc = localizations[source_language]
         if "stringUnit" in source_loc:
             source_text = source_loc["stringUnit"].get("value", key)
+        # Extract source variations (for plurals/gender forms)
+        if "variations" in source_loc:
+            source_variations = source_loc["variations"]
 
     # Parse existing translations
     translations: dict[str, Translation] = {}
@@ -68,6 +72,7 @@ def _parse_entry(key: str, data: dict[str, Any], source_language: str) -> Entry:
         translations=translations,
         extraction_state=extraction_state,
         should_translate=should_translate,
+        source_variations=source_variations,
     )
 
 

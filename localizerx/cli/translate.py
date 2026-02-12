@@ -313,7 +313,7 @@ def _process_file(
     console.print(f"  Found {len(catalog.strings)} string(s)")
 
     # Collect entries to translate per language
-    translation_tasks: dict[str, list[tuple[str, str, str | None]]] = {}
+    translation_tasks: dict[str, list[tuple[str, str, str | None, dict | None]]] = {}
 
     for target_lang in target_langs:
         entries_to_translate = []
@@ -325,7 +325,7 @@ def _process_file(
             if target_lang in entry.translations and not overwrite:
                 continue
 
-            entries_to_translate.append((key, entry.source_text, entry.comment))
+            entries_to_translate.append((key, entry.source_text, entry.comment, entry.source_variations))
 
         if entries_to_translate:
             translation_tasks[target_lang] = entries_to_translate
@@ -360,7 +360,7 @@ def _process_file(
     )
 
 
-def _show_dry_run_table(tasks: dict[str, list[tuple[str, str, str | None]]]) -> None:
+def _show_dry_run_table(tasks: dict[str, list[tuple[str, str, str | None, dict | None]]]) -> None:
     """Show table of strings that would be translated."""
     table = Table(title="Strings to Translate")
     table.add_column("Key", style="cyan")
@@ -370,7 +370,7 @@ def _show_dry_run_table(tasks: dict[str, list[tuple[str, str, str | None]]]) -> 
     # Collect all unique entries
     entries: dict[str, tuple[str, set[str]]] = {}
     for lang, items in tasks.items():
-        for key, text, _ in items:
+        for key, text, _, _ in items:
             if key not in entries:
                 entries[key] = (text, set())
             entries[key][1].add(lang)
@@ -389,7 +389,7 @@ async def _translate_file(
     catalog,
     file_path: Path,
     source_lang: str,
-    translation_tasks: dict[str, list[tuple[str, str, str | None]]],
+    translation_tasks: dict[str, list[tuple[str, str, str | None, dict | None]]],
     config: Config,
     preview: bool,
     backup: bool,
@@ -410,15 +410,29 @@ async def _translate_file(
         cache_dir=cache_dir,
         temperature=actual_temperature,
     ) as translator:
-        all_translations: dict[str, dict[str, str]] = {}  # key -> {lang: translation}
+        all_translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]] = {}  # key -> {lang: (translation, plural_forms)}
 
         for target_lang, entries in translation_tasks.items():
             console.print(f"  Translating to {get_language_name(target_lang)}...")
 
-            requests = [
-                TranslationRequest(key=key, text=text, comment=comment)
-                for key, text, comment in entries
-            ]
+            requests = []
+            for key, text, comment, source_variations in entries:
+                # Extract plural forms if present
+                plural_forms = None
+                if source_variations and "plural" in source_variations:
+                    plural_forms = {}
+                    for form_name, form_data in source_variations["plural"].items():
+                        if "stringUnit" in form_data:
+                            plural_forms[form_name] = form_data["stringUnit"].get("value", "")
+
+                requests.append(
+                    TranslationRequest(
+                        key=key,
+                        text=text,
+                        comment=comment,
+                        plural_forms=plural_forms
+                    )
+                )
 
             with create_progress() as progress:
                 task = progress.add_task(f"    {target_lang}", total=len(requests))
@@ -426,10 +440,10 @@ async def _translate_file(
                 results = await translator.translate_batch(requests, source_lang, target_lang)
 
                 for result in results:
-                    if result.success and result.translated:
+                    if result.success:
                         if result.key not in all_translations:
                             all_translations[result.key] = {}
-                        all_translations[result.key][target_lang] = result.translated
+                        all_translations[result.key][target_lang] = (result.translated, result.translated_plurals)
                     progress.advance(task)
 
         # Show preview if requested
@@ -442,15 +456,32 @@ async def _translate_file(
         # Update catalog
         for key, translations in all_translations.items():
             if key in catalog.strings:
-                for lang, value in translations.items():
-                    catalog.strings[key].translations[lang] = Translation(value=value)
+                for lang, (value, translated_plurals) in translations.items():
+                    # Build variations structure if we have plural translations
+                    variations = None
+                    if translated_plurals:
+                        variations = {
+                            "plural": {}
+                        }
+                        for form_name, form_value in translated_plurals.items():
+                            variations["plural"][form_name] = {
+                                "stringUnit": {
+                                    "state": "translated",
+                                    "value": form_value
+                                }
+                            }
+
+                    catalog.strings[key].translations[lang] = Translation(
+                        value=value,
+                        variations=variations
+                    )
 
         # Write file
         write_xcstrings(catalog, file_path, backup=backup)
         console.print(f"  [green]Saved {file_path}[/green]")
 
 
-def _show_preview_table(translations: dict[str, dict[str, str]], catalog) -> None:
+def _show_preview_table(translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]], catalog) -> None:
     """Show preview of translations."""
     table = Table(title="Translation Preview")
     table.add_column("Key", style="cyan")
@@ -463,8 +494,14 @@ def _show_preview_table(translations: dict[str, dict[str, str]], catalog) -> Non
         source = catalog.strings[key].source_text if key in catalog.strings else ""
         source_display = source[:30] + "..." if len(source) > 30 else source
 
-        for lang, trans in lang_translations.items():
-            trans_display = trans[:40] + "..." if len(trans) > 40 else trans
+        for lang, (trans, plurals) in lang_translations.items():
+            if plurals:
+                # Show plural forms preview
+                plural_preview = ", ".join(f"{k}: {v[:20]}..." if len(v) > 20 else f"{k}: {v}"
+                                           for k, v in plurals.items())
+                trans_display = f"[plurals: {plural_preview[:40]}...]"
+            else:
+                trans_display = trans[:40] + "..." if len(trans) > 40 else trans
             table.add_row(key[:25], source_display, lang, trans_display)
             count += 1
             if count >= 30:

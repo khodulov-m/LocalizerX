@@ -1,0 +1,72 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "weeks_ago": {
+      "comment": "Time elapsed in weeks",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld week"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld weeks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "items_selected": {
+      "comment": "Number of selected items",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No items selected"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%d item selected"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%d items selected"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "simple_string": {
+      "comment": "A non-plural string for comparison",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hello World"
+          }
+        }
+      }
+    }
+  }
+}

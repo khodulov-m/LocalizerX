@@ -51,11 +51,17 @@ class Entry(BaseModel):
     translations: dict[str, Translation] = Field(default_factory=dict)
     extraction_state: str | None = None
     should_translate: bool = True
+    source_variations: dict[str, Any] | None = None  # For plural/gender forms in source language
 
     @property
     def needs_translation(self) -> bool:
         """Check if this entry should be translated."""
-        return self.should_translate and bool(self.source_text.strip())
+        return self.should_translate and (bool(self.source_text.strip()) or self.source_variations is not None)
+
+    @property
+    def has_plurals(self) -> bool:
+        """Check if this entry has plural variations."""
+        return self.source_variations is not None and "plural" in self.source_variations
 
 
 class StringCatalog(BaseModel):

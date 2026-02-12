@@ -113,6 +113,60 @@ class GeminiTranslator(Translator):
         )
         self._cache_conn.commit()
 
+    async def _translate_plural_forms(
+        self,
+        plural_forms: dict[str, str],
+        source_lang: str,
+        target_lang: str,
+    ) -> dict[str, str]:
+        """Translate plural forms (zero, one, two, few, many, other)."""
+        src_name = get_language_name(source_lang)
+        tgt_name = get_language_name(target_lang)
+
+        # Translate each form
+        translated_forms = {}
+        for form_name, form_text in plural_forms.items():
+            # Check cache
+            cache_key = f"plural:{form_name}:{form_text}"
+            cached = self._get_cached(cache_key, source_lang, target_lang)
+            if cached:
+                translated_forms[form_name] = cached
+                continue
+
+            # Mask placeholders
+            masked = mask_placeholders(form_text)
+
+            # Build prompt with plural context
+            prompt = f"""Translate the following {form_name} form of a plural string from {src_name} to {tgt_name}.
+
+IMPORTANT RULES:
+1. Keep all placeholders exactly as they are (like __PH_1__, __PH_2__, etc.)
+2. Preserve any formatting and punctuation style
+3. This is the "{form_name}" plural form (e.g., "one" = singular, "other" = plural)
+4. Translate appropriately for this plural form in {tgt_name}
+5. This is for an iOS/macOS app interface
+
+Text to translate ({form_name} form):
+{masked.masked}
+
+Translation (only provide the translated text, nothing else):"""
+
+            # Call API
+            translated_masked = await self._call_api(prompt)
+
+            # Unmask placeholders
+            translated = unmask_placeholders(translated_masked, masked.placeholders)
+
+            # Preserve whitespace
+            translated = _preserve_whitespace(form_text, translated)
+
+            # Cache result
+            self._set_cached(cache_key, translated, source_lang, target_lang)
+
+            translated_forms[form_name] = translated
+
+        return translated_forms
+
     async def translate_text(
         self,
         text: str,
@@ -161,19 +215,35 @@ class GeminiTranslator(Translator):
 
         # Check cache and prepare masked texts
         for i, req in enumerate(requests):
-            cached = self._get_cached(req.text, source_lang, target_lang)
-            if cached:
+            # Handle plural forms separately
+            if req.plural_forms:
+                # Translate each plural form
+                translated_plurals = await self._translate_plural_forms(
+                    req.plural_forms, source_lang, target_lang
+                )
                 results.append(
                     TranslationResult(
                         key=req.key,
                         original=req.text,
-                        translated=cached,
+                        translated=translated_plurals.get("other", ""),  # Default to "other" form
+                        translated_plurals=translated_plurals,
                     )
                 )
             else:
-                masked = mask_placeholders(req.text)
-                to_translate.append((i, req, masked.masked, masked.placeholders))
-                results.append(TranslationResult(key=req.key, original=req.text, translated=""))
+                # Regular single text translation
+                cached = self._get_cached(req.text, source_lang, target_lang)
+                if cached:
+                    results.append(
+                        TranslationResult(
+                            key=req.key,
+                            original=req.text,
+                            translated=cached,
+                        )
+                    )
+                else:
+                    masked = mask_placeholders(req.text)
+                    to_translate.append((i, req, masked.masked, masked.placeholders))
+                    results.append(TranslationResult(key=req.key, original=req.text, translated=""))
 
         if not to_translate:
             return results
