@@ -78,3 +78,49 @@ class TestDetermineLanguagesToDelete:
         assert "en" not in langs_to_delete  # Source protected
         assert "es" not in langs_to_delete
         assert "ru" not in langs_to_delete
+
+    def test_delete_all_languages(self, catalog_with_multiple_languages):
+        """Test deleting all languages except source."""
+        from localizerx.cli.delete import _determine_languages_to_delete
+
+        langs_to_delete = _determine_languages_to_delete(
+            catalog=catalog_with_multiple_languages,
+            languages=None,
+            delete_all=True,
+            keep=False,
+        )
+
+        assert langs_to_delete == {"fr", "de", "es", "ru"}
+        assert "en" not in langs_to_delete  # Source protected
+
+    def test_delete_with_keep(self, catalog_with_multiple_languages):
+        """Test keeping specific languages, deleting all others."""
+        from localizerx.cli.delete import _determine_languages_to_delete
+
+        # Keep only ru and fr, delete de and es
+        langs_to_delete = _determine_languages_to_delete(
+            catalog=catalog_with_multiple_languages,
+            languages="ru,fr",
+            delete_all=False,
+            keep=True,
+        )
+
+        assert langs_to_delete == {"de", "es"}
+        assert "en" not in langs_to_delete  # Source protected
+        assert "ru" not in langs_to_delete  # Explicitly kept
+        assert "fr" not in langs_to_delete  # Explicitly kept
+
+    def test_protect_source_language(self, catalog_with_multiple_languages):
+        """Test that source language is protected from deletion."""
+        from localizerx.cli.delete import _determine_languages_to_delete
+
+        # Try to delete source language
+        langs_to_delete = _determine_languages_to_delete(
+            catalog=catalog_with_multiple_languages,
+            languages="en,fr",
+            delete_all=False,
+            keep=False,
+        )
+
+        assert "en" not in langs_to_delete
+        assert "fr" in langs_to_delete
