@@ -26,6 +26,11 @@ pip install -e .
 
 # Run CLI
 localizerx translate <path> --to fr,es,de --src en
+
+# Run delete command
+localizerx delete fr,de --backup
+localizerx delete --all --yes
+localizerx delete ru --keep
 ```
 
 ## Architecture
@@ -43,6 +48,7 @@ CLI (Typer)
 ### Package Structure
 
 - `localizerx/cli.py` - Typer-based CLI commands
+- `localizerx/cli/delete.py` - Delete languages from xcstrings files
 - `localizerx/config.py` - Configuration management (TOML)
 - `localizerx/io/xcstrings.py` - Lossless xcstrings file I/O
 - `localizerx/io/extension.py` - Chrome Extension _locales/ I/O
