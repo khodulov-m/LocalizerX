@@ -27,6 +27,9 @@ pip install -e .
 # Run CLI
 localizerx translate <path> --to fr,es,de --src en
 
+# Translate with custom instructions
+localizerx translate <path> --to fr,es,de --custom-prompt "Do not translate proper names. Do not translate the word 'Water'"
+
 # Run delete command
 localizerx delete fr,de --backup
 localizerx delete --all --yes
@@ -72,6 +75,7 @@ CLI (Typer)
 - **Translator abstraction**: Provider-agnostic interface allows swapping Gemini for other APIs
 - **Placeholder masking**: Mask placeholders before translation (`%@` → `__PH_1__`, `$NAME$` → `__PH_1__`), restore after
 - **SQLite caching**: Key is `(src_lang, tgt_lang, text_hash)` to avoid redundant API calls
+- **Custom instructions**: Support for custom translation rules via `--custom-prompt` CLI option or `custom_instructions` config field
 
 ### Data Models
 

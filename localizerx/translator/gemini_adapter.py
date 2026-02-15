@@ -46,6 +46,7 @@ class GeminiTranslator(Translator):
         cache_dir: Path | None = None,
         temperature: float = 0.3,
         thinking_config: dict[str, str] | None = None,
+        custom_instructions: str | None = None,
     ):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
@@ -59,6 +60,7 @@ class GeminiTranslator(Translator):
         self.max_retries = max_retries
         self.temperature = temperature
         self.thinking_config = thinking_config
+        self.custom_instructions = custom_instructions
         self.client = httpx.AsyncClient(timeout=60.0)
 
         # Setup cache
@@ -99,9 +101,7 @@ class GeminiTranslator(Translator):
         row = cursor.fetchone()
         return row[0] if row else None
 
-    def _set_cached(
-        self, text: str, translated: str, src_lang: str, tgt_lang: str
-    ) -> None:
+    def _set_cached(self, text: str, translated: str, src_lang: str, tgt_lang: str) -> None:
         """Cache a translation."""
         if not self._cache_conn:
             return
@@ -144,7 +144,12 @@ IMPORTANT RULES:
 2. Preserve any formatting and punctuation style
 3. This is the "{form_name}" plural form (e.g., "one" = singular, "other" = plural)
 4. Translate appropriately for this plural form in {tgt_name}
-5. This is for an iOS/macOS app interface
+5. This is for an iOS/macOS app interface"""
+
+            if self.custom_instructions:
+                prompt += f"\n6. {self.custom_instructions}"
+
+            prompt += f"""
 
 Text to translate ({form_name} form):
 {masked.masked}
@@ -257,9 +262,7 @@ Translation (only provide the translated text, nothing else):"""
             batch = to_translate[batch_start : batch_start + self.batch_size]
             batch_results = await self._translate_batch_items(batch, src_name, tgt_name)
 
-            for (idx, req, _, placeholders), translated_masked in zip(
-                batch, batch_results
-            ):
+            for (idx, req, _, placeholders), translated_masked in zip(batch, batch_results):
                 translated = unmask_placeholders(translated_masked, placeholders)
                 # Preserve original whitespace
                 translated = _preserve_whitespace(req.text, translated)
@@ -301,9 +304,7 @@ Translation (only provide the translated text, nothing else):"""
         response = await self._call_api(prompt)
         return self._parse_batch_response(response, len(items))
 
-    def _build_prompt(
-        self, text: str, src_name: str, tgt_name: str, context: str | None
-    ) -> str:
+    def _build_prompt(self, text: str, src_name: str, tgt_name: str, context: str | None) -> str:
         """Build translation prompt for single text."""
         prompt = f"""Translate the following text from {src_name} to {tgt_name}.
 
@@ -311,10 +312,12 @@ IMPORTANT RULES:
 1. Keep all placeholders exactly as they are (like __PH_1__, __PH_2__, etc.)
 2. Preserve any formatting, line breaks, and punctuation style
 3. Translate naturally, not word-for-word
-4. This is for an iOS/macOS app interface
+4. This is for an iOS/macOS app interface"""
 
-Text to translate:
-{text}"""
+        if self.custom_instructions:
+            prompt += f"\n5. {self.custom_instructions}"
+
+        prompt += f"\n\nText to translate:\n{text}"
 
         if context:
             prompt += f"\n\nContext/Note: {context}"
@@ -323,8 +326,12 @@ Text to translate:
         return prompt
 
     def _build_batch_prompt(
-        self, batch_text: str, count: int, src_name: str, tgt_name: str,
-        contexts: list[str] | None = None
+        self,
+        batch_text: str,
+        count: int,
+        src_name: str,
+        tgt_name: str,
+        contexts: list[str] | None = None,
     ) -> str:
         """Build translation prompt for batch."""
         prompt = f"""Translate the following {count} texts from {src_name} to {tgt_name}.
@@ -336,15 +343,16 @@ CRITICAL RULES:
 4. This is for an iOS/macOS app interface
 5. Return ONLY the translations using the EXACT SAME <<ITEM_N>> markers
 6. Do NOT include any context notes, explanations, or metadata in the translations
-7. IMPORTANT: Each <<ITEM_N>> block is ONE translation unit. If the source has multiple paragraphs or blank lines, the translation MUST also have multiple paragraphs within the SAME <<ITEM_N>> block. NEVER split multi-paragraph content across different ITEM markers.
+7. IMPORTANT: Each <<ITEM_N>> block is ONE translation unit. If the source has multiple paragraphs or blank lines, the translation MUST also have multiple paragraphs within the SAME <<ITEM_N>> block. NEVER split multi-paragraph content across different ITEM markers."""
 
-Texts to translate:
-{batch_text}"""
+        if self.custom_instructions:
+            prompt += f"\n8. {self.custom_instructions}"
+
+        prompt += f"\n\nTexts to translate:\n{batch_text}"
 
         if contexts:
             prompt += (
-                "\n\nContext notes (for your reference only,"
-                " do NOT include in translations):\n"
+                "\n\nContext notes (for your reference only," " do NOT include in translations):\n"
             )
             prompt += "\n".join(contexts)
 
@@ -388,6 +396,7 @@ Texts to translate:
     def _strip_context_metadata(self, text: str) -> str:
         """Remove any context metadata that leaked into the translation."""
         import re
+
         # Remove [Context: ...], [Контекст: ...], [Contexto: ...], etc.
         # This handles various language variants of "Context"
         patterns = [

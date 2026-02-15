@@ -48,14 +48,39 @@ class TranslatorConfig(BaseModel):
     batch_size: int = Field(default=100, ge=1, le=100)
     max_retries: int = Field(default=3, ge=1, le=10)
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
+    custom_instructions: str | None = None
     screenshots: ScreenshotsConfig = Field(default_factory=ScreenshotsConfig)
 
 
 DEFAULT_TARGET_LANGUAGES = [
-    "ru", "fr-FR", "pt-BR", "es-MX", "it", "ja", "pl", "no",
-    "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk",
-    "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi",
-    "en-GB", "ms", "id","tr",
+    "ru",
+    "fr-FR",
+    "pt-BR",
+    "es-MX",
+    "it",
+    "ja",
+    "pl",
+    "no",
+    "de-DE",
+    "nl-NL",
+    "ko",
+    "da",
+    "sk",
+    "sv",
+    "ro",
+    "uk",
+    "hi",
+    "he",
+    "hr",
+    "zh-Hans",
+    "zh-Hant",
+    "fi",
+    "th",
+    "vi",
+    "en-GB",
+    "ms",
+    "id",
+    "tr",
 ]
 
 
@@ -116,7 +141,7 @@ def create_default_config(path: Path | None = None) -> Path:
     config_path = path or DEFAULT_CONFIG_PATH
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    default_content = '''# LocalizerX Configuration
+    default_content = """# LocalizerX Configuration
 
 # Source language for translations (default: en)
 source_language = "en"
@@ -158,6 +183,10 @@ temperature = 0.3
 # Maximum retry attempts for failed requests
 max_retries = 3
 
+# Custom translation instructions
+# Example: "Do not translate proper names. Do not translate the word 'Water'"
+# custom_instructions = "Do not translate proper names"
+
 [translator.screenshots]
 # Gemini model for screenshot text generation and translation
 model = "gemini-3-flash-preview"
@@ -170,7 +199,7 @@ thinking_level = "low"
 
 # Number of screenshot texts per batch API call (1–50)
 batch_size = 50
-'''
+"""
 
     config_path.write_text(default_content)
     return config_path

@@ -106,6 +106,7 @@ class TestTranslatorConfig:
         assert tc.provider == "gemini"
         assert tc.batch_size == 100
         assert tc.max_retries == 3
+        assert tc.custom_instructions is None
 
     def test_translator_config_custom_values(self):
         """TranslatorConfig should accept custom values."""
@@ -145,6 +146,14 @@ class TestTranslatorConfig:
 
         with pytest.raises(ValueError):
             TranslatorConfig(max_retries=11)
+
+    def test_translator_config_custom_instructions(self):
+        """TranslatorConfig should accept custom_instructions."""
+        tc = TranslatorConfig(custom_instructions="Do not translate proper names")
+        assert tc.custom_instructions == "Do not translate proper names"
+
+        tc = TranslatorConfig(custom_instructions=None)
+        assert tc.custom_instructions is None
 
 
 class TestLoadConfig:
@@ -208,6 +217,19 @@ class TestLoadConfig:
             config = load_config(config_path)
             assert config.translator.model == "gemini-2.5-pro"
             assert config.translator.batch_size == 50
+        finally:
+            config_path.unlink()
+
+    def test_load_config_with_custom_instructions(self):
+        """Load config with custom translation instructions."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write('[translator]\n')
+            f.write('custom_instructions = "Do not translate proper names"\n')
+            config_path = Path(f.name)
+
+        try:
+            config = load_config(config_path)
+            assert config.translator.custom_instructions == "Do not translate proper names"
         finally:
             config_path.unlink()
 

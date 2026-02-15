@@ -119,6 +119,14 @@ def translate(
             max=2.0,
         ),
     ] = None,
+    custom_prompt: Annotated[
+        Optional[str],
+        typer.Option(
+            "--custom-prompt",
+            "--instructions",
+            help="Custom instructions for translation (e.g., 'Do not translate proper names')",
+        ),
+    ] = None,
 ) -> None:
     """Translate an .xcstrings file to target languages.
 
@@ -136,6 +144,7 @@ def translate(
         batch_size=batch_size,
         model=model,
         temperature=temperature,
+        custom_prompt=custom_prompt,
     )
 
 
@@ -151,6 +160,7 @@ def _run_translate(
     batch_size: int | None,
     model: str | None,
     temperature: float | None,
+    custom_prompt: str | None,
 ) -> None:
     """Core translation logic."""
     # Load configuration
@@ -228,6 +238,7 @@ def _run_translate(
             batch_size=batch_size,
             model=model,
             temperature=temperature,
+            custom_prompt=custom_prompt,
         )
 
 
@@ -304,6 +315,7 @@ def _process_file(
     batch_size: int | None,
     model: str | None,
     temperature: float | None,
+    custom_prompt: str | None,
 ) -> None:
     """Process a single xcstrings file."""
     console.print(f"[bold]Processing:[/bold] {file_path}")
@@ -325,7 +337,9 @@ def _process_file(
             if target_lang in entry.translations and not overwrite:
                 continue
 
-            entries_to_translate.append((key, entry.source_text, entry.comment, entry.source_variations))
+            entries_to_translate.append(
+                (key, entry.source_text, entry.comment, entry.source_variations)
+            )
 
         if entries_to_translate:
             translation_tasks[target_lang] = entries_to_translate
@@ -356,6 +370,7 @@ def _process_file(
             batch_size=batch_size,
             model=model,
             temperature=temperature,
+            custom_prompt=custom_prompt,
         )
     )
 
@@ -396,12 +411,14 @@ async def _translate_file(
     batch_size: int | None,
     model: str | None,
     temperature: float | None,
+    custom_prompt: str | None,
 ) -> None:
     """Perform translations and update catalog."""
     cache_dir = get_cache_dir(config)
     actual_batch_size = batch_size or config.translator.batch_size
     actual_model = model or config.translator.model
     actual_temperature = temperature if temperature is not None else config.translator.temperature
+    actual_custom_instructions = custom_prompt or config.translator.custom_instructions
 
     async with GeminiTranslator(
         model=actual_model,
@@ -409,8 +426,11 @@ async def _translate_file(
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,
         temperature=actual_temperature,
+        custom_instructions=actual_custom_instructions,
     ) as translator:
-        all_translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]] = {}  # key -> {lang: (translation, plural_forms)}
+        all_translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]] = (
+            {}
+        )  # key -> {lang: (translation, plural_forms)}
 
         for target_lang, entries in translation_tasks.items():
             console.print(f"  Translating to {get_language_name(target_lang)}...")
@@ -427,10 +447,7 @@ async def _translate_file(
 
                 requests.append(
                     TranslationRequest(
-                        key=key,
-                        text=text,
-                        comment=comment,
-                        plural_forms=plural_forms
+                        key=key, text=text, comment=comment, plural_forms=plural_forms
                     )
                 )
 
@@ -443,7 +460,10 @@ async def _translate_file(
                     if result.success:
                         if result.key not in all_translations:
                             all_translations[result.key] = {}
-                        all_translations[result.key][target_lang] = (result.translated, result.translated_plurals)
+                        all_translations[result.key][target_lang] = (
+                            result.translated,
+                            result.translated_plurals,
+                        )
                     progress.advance(task)
 
         # Show preview if requested
@@ -460,20 +480,14 @@ async def _translate_file(
                     # Build variations structure if we have plural translations
                     variations = None
                     if translated_plurals:
-                        variations = {
-                            "plural": {}
-                        }
+                        variations = {"plural": {}}
                         for form_name, form_value in translated_plurals.items():
                             variations["plural"][form_name] = {
-                                "stringUnit": {
-                                    "state": "translated",
-                                    "value": form_value
-                                }
+                                "stringUnit": {"state": "translated", "value": form_value}
                             }
 
                     catalog.strings[key].translations[lang] = Translation(
-                        value=value,
-                        variations=variations
+                        value=value, variations=variations
                     )
 
         # Write file
@@ -481,7 +495,9 @@ async def _translate_file(
         console.print(f"  [green]Saved {file_path}[/green]")
 
 
-def _show_preview_table(translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]], catalog) -> None:
+def _show_preview_table(
+    translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]], catalog
+) -> None:
     """Show preview of translations."""
     table = Table(title="Translation Preview")
     table.add_column("Key", style="cyan")
@@ -497,8 +513,9 @@ def _show_preview_table(translations: dict[str, dict[str, tuple[str, dict[str, s
         for lang, (trans, plurals) in lang_translations.items():
             if plurals:
                 # Show plural forms preview
-                plural_preview = ", ".join(f"{k}: {v[:20]}..." if len(v) > 20 else f"{k}: {v}"
-                                           for k, v in plurals.items())
+                plural_preview = ", ".join(
+                    f"{k}: {v[:20]}..." if len(v) > 20 else f"{k}: {v}" for k, v in plurals.items()
+                )
                 trans_display = f"[plurals: {plural_preview[:40]}...]"
             else:
                 trans_display = trans[:40] + "..." if len(trans) > 40 else trans
