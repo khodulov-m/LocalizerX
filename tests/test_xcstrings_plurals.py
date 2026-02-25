@@ -199,13 +199,13 @@ class TestPluralTranslation:
         ]
 
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
-            # First call: "Hello" translation
-            # Second call: plural "one" form
-            # Third call: plural "other" form
+            # First call: plural "one" form
+            # Second call: plural "other" form
+            # Third call: "Hello" translation batch
             mock_api.side_effect = [
-                "Hola",  # Simple string
                 "__PH_1__ elemento",  # Plural one
-                "__PH_1__ elementos"  # Plural other
+                "__PH_1__ elementos",  # Plural other
+                "Hola"  # Simple string
             ]
 
             results = await translator.translate_batch(requests, "en", "es")

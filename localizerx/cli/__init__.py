@@ -122,7 +122,7 @@ def main(
         typer.Option(
             "--model",
             "-m",
-            help="Gemini model to use (see 'localizerx models' for list)",
+            help="Gemini model to use (see 'localizerx list' for list)",
         ),
     ] = None,
     temperature: Annotated[
@@ -191,19 +191,88 @@ def init(
     console.print(f"[green]Created configuration file:[/green] {config_path}")
 
 
-@app.command()
-def models() -> None:
-    """List available Gemini models."""
-    table = Table(title="Available Gemini Models")
-    table.add_column("Model", style="cyan")
-    table.add_column("Default", style="green")
+@app.command("list")
+def list_models() -> None:
+    """List available Gemini models from the API."""
+    import os
+    import httpx
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        console.print("[red]Error: GEMINI_API_KEY environment variable is not set.[/red]")
+        raise typer.Exit(1)
+        
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    try:
+        response = httpx.get(url, timeout=10.0)
+        response.raise_for_status()
+        data = response.json()
+        models = [m["name"].replace("models/", "") for m in data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
+        
+        table = Table(title="Available Gemini Models")
+        table.add_column("Model", style="cyan")
+        
+        for m in models:
+            table.add_row(m)
+            
+        console.print(table)
+    except Exception as e:
+        console.print(f"[red]Error fetching models: {e}[/red]")
+        raise typer.Exit(1)
 
-    for model in GEMINI_MODELS:
-        is_default = "✓" if model == DEFAULT_MODEL else ""
-        table.add_row(model, is_default)
 
-    console.print(table)
-    console.print("\nUse [cyan]--model[/cyan] option or set in config.toml")
+@app.command("use")
+def use_model(
+    model: Annotated[str, typer.Argument(help="Gemini model to use")],
+    thinking_level: Annotated[
+        str,
+        typer.Option(
+            "--thinking-level",
+            help="Thinking level (minimal, low, medium, high) or 0 to disable",
+        ),
+    ] = "0",
+) -> None:
+    """Set the specified model and thinking level in config.toml."""
+    import re
+    from localizerx.config import DEFAULT_CONFIG_PATH, create_default_config
+
+    config_path = DEFAULT_CONFIG_PATH
+    if not config_path.exists():
+        console.print("[yellow]Config file not found, creating default...[/yellow]")
+        create_default_config(config_path)
+
+    content = config_path.read_text()
+
+    # Update model in [translator]
+    section_pattern = re.compile(r"^\[translator\]$", re.MULTILINE)
+    match = section_pattern.search(content)
+    if not match:
+        content += f"\n[translator]\nmodel = \"{model}\"\nthinking_level = \"{thinking_level}\"\n"
+    else:
+        # Extract the translator section
+        start = match.end()
+        next_section = re.search(r"^\[.*?\]", content[start:], re.MULTILINE)
+        end = start + next_section.start() if next_section else len(content)
+        section_content = content[start:end]
+
+        # Update model
+        model_pattern = re.compile(r"^model\s*=\s*.*$", re.MULTILINE)
+        if model_pattern.search(section_content):
+            section_content = model_pattern.sub(f'model = "{model}"', section_content)
+        else:
+            section_content = f'model = "{model}"\n' + section_content
+
+        # Update thinking_level
+        thinking_pattern = re.compile(r"^thinking_level\s*=\s*.*$", re.MULTILINE)
+        if thinking_pattern.search(section_content):
+            section_content = thinking_pattern.sub(f'thinking_level = "{thinking_level}"', section_content)
+        else:
+            section_content += f'thinking_level = "{thinking_level}"\n'
+
+        content = content[:start] + section_content + content[end:]
+
+    config_path.write_text(content)
+    console.print(f"[green]Successfully set model to [cyan]{model}[/cyan] with thinking_level [cyan]{thinking_level}[/cyan].[/green]")
 
 
 @app.command()

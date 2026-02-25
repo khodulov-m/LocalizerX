@@ -386,7 +386,11 @@ async def _translate_chrome(
     cache_dir = get_cache_dir(config)
     actual_model = model or config.translator.model
 
+    thinking_level = getattr(config.translator, "thinking_level", "0")
+    thinking_config = {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+
     async with GeminiTranslator(
+        thinking_config=thinking_config,
         model=actual_model,
         batch_size=config.translator.batch_size,
         max_retries=config.translator.max_retries,

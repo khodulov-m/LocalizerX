@@ -784,7 +784,11 @@ async def _translate_metadata(
 
     semaphore = asyncio.Semaphore(5)
 
+    thinking_level = getattr(config.translator, "thinking_level", "0")
+    thinking_config = {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+
     async with GeminiTranslator(
+        thinking_config=thinking_config,
         model=actual_model,
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,

@@ -440,7 +440,11 @@ async def _translate_file(
         if app_context:
             console.print("[dim]Using extracted app context for translations[/dim]")
 
+    thinking_level = getattr(config.translator, "thinking_level", "0")
+    thinking_config = {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+
     async with GeminiTranslator(
+        thinking_config=thinking_config,
         model=actual_model,
         batch_size=actual_batch_size,
         max_retries=config.translator.max_retries,

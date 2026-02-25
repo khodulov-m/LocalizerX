@@ -253,11 +253,20 @@ class TestCLICommands:
         assert result.exit_code == 0
         assert "Found 1 .xcstrings file(s)" in result.stdout
 
-    def test_models_command(self):
-        """Test models command."""
-        result = runner.invoke(app, ["models"])
-        assert result.exit_code == 0
-        assert "Available Gemini Models" in result.stdout
+    @patch("httpx.get")
+    def test_list_command(self, mock_get):
+        """Test list command."""
+        import os
+        from unittest.mock import MagicMock
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "fake-key"}):
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"models": [{"name": "models/fake-model", "supportedGenerationMethods": ["generateContent"]}]}
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
+            
+            result = runner.invoke(app, ["list"])
+            assert result.exit_code == 0
+            assert "fake-model" in result.stdout
 
     def test_languages_command(self):
         """Test languages command."""
