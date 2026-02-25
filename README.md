@@ -16,6 +16,7 @@ CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`), App 
 - Preserve placeholders (`%@`, `%d`, `{name}`, `{{name}}`, `{0}`, `$PLACEHOLDER$`, `$1`) during translation
 - Support for pluralization and declension forms
 - Use developer comments for translation context
+- Automatically enrich AI translation prompts with app context (name, description) extracted from fastlane/metadata or Xcode project files
 - SQLite caching to reduce API calls
 - Optional backups before changes (`--backup`)
 
@@ -101,6 +102,7 @@ model = "gemini-2.5-flash-lite"
 batch_size = 100
 temperature = 0.3
 max_retries = 3
+use_app_context = true # Automatically extract and use app context in prompts
 
 cache_enabled = true
 ```
@@ -147,6 +149,7 @@ localizerx translate ./MyApp --to fr,es,de
 | `--model` | `-m` | Gemini model to use |
 | `--temperature` | `-T` | Sampling temperature (0.0–2.0). Lower = more deterministic. |
 | `--config` | `-c` | Path to configuration file |
+| `--no-app-context` | | Disable automatic app context extraction from metadata |
 
 ### Translate App Store Metadata
 

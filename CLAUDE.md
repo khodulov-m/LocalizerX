@@ -68,6 +68,7 @@ CLI (Typer)
 - `localizerx/utils/placeholders.py` - Placeholder masking/unmasking (%@, %d, {name}, $NAME$, $1)
 - `localizerx/utils/locale.py` - Language/locale mapping
 - `localizerx/utils/limits.py` - Character limit validation (App Store + Chrome Web Store)
+- `localizerx/utils/context.py` - App context extraction (from metadata, workspace, project)
 
 ### Key Design Principles
 
