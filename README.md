@@ -1,5 +1,7 @@
 # LocalizerX
 
+> **Note:** You can use `lox` as a shorthand alias for the `localizerx` command everywhere.
+
 CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`), App Store metadata, Chrome Extension messages, frontend i18n JSON files, and Android `strings.xml` using Gemini API.
 
 ## Features

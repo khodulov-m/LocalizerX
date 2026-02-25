@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-LocalizerX is a Python-based CLI tool designed to automate the translation of various software localization and metadata formats using the Google Gemini API. It targets macOS users and runs on Python 3.10+.
+LocalizerX (or `lox` for short) is a Python-based CLI tool designed to automate the translation of various software localization and metadata formats using the Google Gemini API. It targets macOS users and runs on Python 3.10+.
 
 ### Core Capabilities
 - Translates Xcode String Catalogs (`.xcstrings`), Android `strings.xml`, frontend i18n JSON files, and Chrome Extension `_locales` messages.

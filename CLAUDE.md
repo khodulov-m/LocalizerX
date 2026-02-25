@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LocalizerX is a Python CLI tool for macOS that automates translation of Xcode String Catalogs (`.xcstrings` files), App Store metadata, App Store screenshot texts, and Chrome Extension `_locales/` message files using Google's Gemini API. It handles placeholder preservation, pluralization rules, and developer comments while translating iOS localization files and Chrome Extension messages.
+LocalizerX (or `lox` for short) is a Python CLI tool for macOS that automates translation of Xcode String Catalogs (`.xcstrings` files), App Store metadata, App Store screenshot texts, and Chrome Extension `_locales/` message files using Google's Gemini API. It handles placeholder preservation, pluralization rules, and developer comments while translating iOS localization files and Chrome Extension messages.
 
 ## Development Commands
 

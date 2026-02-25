@@ -43,6 +43,7 @@ dev = [
 
 [project.scripts]
 localizerx = "localizerx.cli:app"
+lox = "localizerx.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/localizerx/localizerx"
