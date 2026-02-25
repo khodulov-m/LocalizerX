@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 from rich.table import Table
-
-import re
 
 from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config

@@ -263,7 +263,7 @@ class TestCLICommands:
             mock_response.json.return_value = {"models": [{"name": "models/fake-model", "supportedGenerationMethods": ["generateContent"]}]}
             mock_response.raise_for_status = MagicMock()
             mock_get.return_value = mock_response
-            
+
             result = runner.invoke(app, ["list"])
             assert result.exit_code == 0
             assert "fake-model" in result.stdout

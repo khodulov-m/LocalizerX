@@ -1,15 +1,15 @@
 """Tests for plural forms translation in xcstrings."""
 
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
 import json
 import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from localizerx.io.xcstrings import read_xcstrings, write_xcstrings
 from localizerx.parser.model import Entry, Translation
-from localizerx.translator.base import TranslationRequest, TranslationResult
+from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
 
 

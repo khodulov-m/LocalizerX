@@ -135,6 +135,13 @@ def translate(
             help="Disable automatic app context extraction (name, subtitle, description) from metadata or project files.",
         ),
     ] = False,
+    refresh: Annotated[
+        bool,
+        typer.Option(
+            "--refresh",
+            help="Automatically add translations for new strings and delete stale strings.",
+        ),
+    ] = False,
 ) -> None:
     """Translate an .xcstrings file to target languages.
 
@@ -154,6 +161,7 @@ def translate(
         temperature=temperature,
         custom_prompt=custom_prompt,
         no_app_context=no_app_context,
+        refresh=refresh,
     )
 
 
@@ -171,6 +179,7 @@ def _run_translate(
     temperature: float | None,
     custom_prompt: str | None,
     no_app_context: bool,
+    refresh: bool,
 ) -> None:
     """Core translation logic."""
     # Load configuration
@@ -250,6 +259,7 @@ def _run_translate(
             temperature=temperature,
             custom_prompt=custom_prompt,
             no_app_context=no_app_context,
+            refresh=refresh,
         )
 
 
@@ -328,6 +338,7 @@ def _process_file(
     temperature: float | None,
     custom_prompt: str | None,
     no_app_context: bool,
+    refresh: bool,
 ) -> None:
     """Process a single xcstrings file."""
     console.print(f"[bold]Processing:[/bold] {file_path}")
@@ -339,10 +350,26 @@ def _process_file(
     # Collect entries to translate per language
     translation_tasks: dict[str, list[tuple[str, str, str | None, dict | None]]] = {}
 
+    stale_keys = []
+    if refresh:
+        for key, entry in catalog.strings.items():
+            if entry.extraction_state == "stale":
+                stale_keys.append(key)
+
+        for key in stale_keys:
+            del catalog.strings[key]
+
+        if stale_keys:
+            console.print(f"  [yellow]Removed {len(stale_keys)} stale string(s)[/yellow]")
+
     for target_lang in target_langs:
         entries_to_translate = []
         for key, entry in catalog.strings.items():
             if not entry.needs_translation:
+                continue
+
+            # In refresh mode, only target "new" strings
+            if refresh and entry.extraction_state != "new":
                 continue
 
             # Skip if translation exists and not overwriting
@@ -357,7 +384,14 @@ def _process_file(
             translation_tasks[target_lang] = entries_to_translate
 
     if not translation_tasks:
-        console.print("  [green]All strings already translated[/green]")
+        if refresh and stale_keys:
+            if dry_run:
+                console.print("  [yellow]Dry run - no changes made[/yellow]")
+                return
+            write_xcstrings(catalog, file_path, backup=backup)
+            console.print(f"  [green]Saved {file_path}[/green]")
+        else:
+            console.print("  [green]All strings already translated[/green]")
         return
 
     # Show summary

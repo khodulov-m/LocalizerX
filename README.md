@@ -143,6 +143,7 @@ localizerx translate ./MyApp --to fr,es,de
 | `--to` | `-t` | Target languages (comma-separated). Omit to use `default_targets` from config. |
 | `--src` | `-s` | Source language (default: `en`) |
 | `--dry-run` | `-n` | Show what would be translated without changes |
+| `--refresh` | | Automatically add translations for new strings and delete stale strings |
 | `--preview` | `-p` | Preview translations before applying |
 | `--overwrite` | | Overwrite existing translations |
 | `--backup` | `-b` | Create backup before writing changes |

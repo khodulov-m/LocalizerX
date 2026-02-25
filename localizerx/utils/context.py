@@ -25,7 +25,7 @@ def extract_app_context_string(source_locale: str = "en-US") -> str | None:
                 locale_data = catalog.locales["en-US"]
             if not locale_data and catalog.locales:
                 locale_data = next(iter(catalog.locales.values()))
-                
+
             if locale_data:
                 app_context = AppContext.from_metadata(locale_data)
                 context_str = app_context.to_prompt_context(max_desc_length=150)
@@ -37,12 +37,12 @@ def extract_app_context_string(source_locale: str = "en-US") -> str | None:
 
     # 2. Fallback to Xcode workspace or project name
     cwd = Path.cwd()
-    
+
     # Try .xcworkspace first
     workspaces = list(cwd.glob("*.xcworkspace"))
     if workspaces:
         return f"- App Name: {workspaces[0].stem}"
-        
+
     # Then try .xcodeproj
     projects = list(cwd.glob("*.xcodeproj"))
     if projects:

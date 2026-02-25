@@ -172,6 +172,7 @@ def main(
             temperature=temperature,
             custom_prompt=custom_prompt,
             no_app_context=no_app_context,
+            refresh=False,
         )
     elif ctx.invoked_subcommand is None:
         # No subcommand and no --to, show help
@@ -195,26 +196,27 @@ def init(
 def list_models() -> None:
     """List available Gemini models from the API."""
     import os
+
     import httpx
-    
+
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         console.print("[red]Error: GEMINI_API_KEY environment variable is not set.[/red]")
         raise typer.Exit(1)
-        
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
     try:
         response = httpx.get(url, timeout=10.0)
         response.raise_for_status()
         data = response.json()
         models = [m["name"].replace("models/", "") for m in data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
-        
+
         table = Table(title="Available Gemini Models")
         table.add_column("Model", style="cyan")
-        
+
         for m in models:
             table.add_row(m)
-            
+
         console.print(table)
     except Exception as e:
         console.print(f"[red]Error fetching models: {e}[/red]")
@@ -234,6 +236,7 @@ def use_model(
 ) -> None:
     """Set the specified model and thinking level in config.toml."""
     import re
+
     from localizerx.config import DEFAULT_CONFIG_PATH, create_default_config
 
     config_path = DEFAULT_CONFIG_PATH

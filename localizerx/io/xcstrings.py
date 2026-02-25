@@ -124,6 +124,11 @@ def write_xcstrings(
     if "strings" not in data:
         data["strings"] = {}
 
+    # Remove strings that were deleted from catalog
+    keys_to_remove = [k for k in data["strings"].keys() if k not in catalog.strings]
+    for k in keys_to_remove:
+        del data["strings"][k]
+
     # Update translations in the data
     for key, entry in catalog.strings.items():
         if key not in data["strings"]:

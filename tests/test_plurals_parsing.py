@@ -1,10 +1,11 @@
 """Test plural variations parsing and translation."""
 
-from pathlib import Path
 import json
+from pathlib import Path
+
 import pytest
 
-from localizerx.io.xcstrings import read_xcstrings, write_xcstrings
+from localizerx.io.xcstrings import read_xcstrings
 
 
 class TestPluralsParsing:
