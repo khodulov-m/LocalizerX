@@ -6,6 +6,7 @@ CLI tool for automatic translation of Xcode String Catalogs (`.xcstrings`), App 
 
 ## Features
 
+- **AI Agent Ready:** Includes a standard Agent Skill (`use-localizerx`) for Claude Code and Gemini CLI, allowing AI agents to autonomously translate your project.
 - Translate `.xcstrings` files to multiple languages with a single command
 - Translate fastlane App Store metadata (name, subtitle, description, keywords, etc.)
 - Generate App Store screenshot texts using AI with app context from fastlane metadata

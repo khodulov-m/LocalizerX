@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LocalizerX (or `lox` for short) is a Python CLI tool for macOS that automates translation of Xcode String Catalogs (`.xcstrings` files), App Store metadata, App Store screenshot texts, and Chrome Extension `_locales/` message files using Google's Gemini API. It handles placeholder preservation, pluralization rules, and developer comments while translating iOS localization files and Chrome Extension messages.
 
+## AI Agent Skills
+
+This repository includes an Agent Skill located at `skills/localizerx/SKILL.md` that enables Claude Code and other compatible AI agents to easily use the `localizerx` CLI tool for automating translation tasks across the project. Use the skill instructions when tasked with localization.
+
 ## Development Commands
 
 ```bash
