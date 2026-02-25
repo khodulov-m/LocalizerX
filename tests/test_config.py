@@ -107,6 +107,7 @@ class TestTranslatorConfig:
         assert tc.batch_size == 100
         assert tc.max_retries == 3
         assert tc.custom_instructions is None
+        assert tc.use_app_context is True
 
     def test_translator_config_custom_values(self):
         """TranslatorConfig should accept custom values."""
@@ -334,3 +335,4 @@ class TestCreateDefaultConfig:
             assert "model" in content
             assert "batch_size" in content
             assert "max_retries" in content
+            assert "use_app_context" in content

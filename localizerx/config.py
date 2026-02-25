@@ -188,6 +188,9 @@ max_retries = 3
 # Example: "Do not translate proper names. Do not translate the word 'Water'"
 # custom_instructions = "Do not translate proper names"
 
+# Automatically extract and use app context from fastlane metadata or Xcode projects
+use_app_context = true
+
 [translator.screenshots]
 # Gemini model for screenshot text generation and translation
 model = "gemini-3-flash-preview"
