@@ -50,26 +50,33 @@ class AppContext:
             keywords=keywords,
         )
 
-    @property
-    def description_summary(self) -> str | None:
-        """Get a shortened description for prompts (first 500 chars).
+    def get_description_summary(self, max_length: int = 500) -> str | None:
+        """Get a shortened description for prompts.
+
+        Args:
+            max_length: Maximum number of characters
 
         Returns:
             Truncated description or None if no description exists
         """
         if not self.description:
             return None
-        if len(self.description) <= 500:
+        if len(self.description) <= max_length:
             return self.description
         # Truncate at word boundary
-        truncated = self.description[:500]
+        truncated = self.description[:max_length]
         last_space = truncated.rfind(" ")
-        if last_space > 400:
+        # Try to find a space within the last 20% of the truncated string
+        min_space_pos = int(max_length * 0.8)
+        if last_space > min_space_pos:
             truncated = truncated[:last_space]
         return truncated + "..."
 
-    def to_prompt_context(self) -> str:
+    def to_prompt_context(self, max_desc_length: int = 500) -> str:
         """Format app context for inclusion in generation prompts.
+
+        Args:
+            max_desc_length: Maximum length for the description field
 
         Returns:
             Formatted string describing the app for prompt injection
@@ -82,8 +89,9 @@ class AppContext:
         if self.promo_text:
             lines.append(f"- Promo: {self.promo_text}")
 
-        if self.description_summary:
-            lines.append(f"- Description: {self.description_summary}")
+        desc = self.get_description_summary(max_desc_length)
+        if desc:
+            lines.append(f"- Description: {desc}")
 
         if self.keywords:
             # Include top keywords for context

@@ -47,6 +47,7 @@ class GeminiTranslator(Translator):
         temperature: float = 0.3,
         thinking_config: dict[str, str] | None = None,
         custom_instructions: str | None = None,
+        app_context: str | None = None,
     ):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
@@ -61,6 +62,7 @@ class GeminiTranslator(Translator):
         self.temperature = temperature
         self.thinking_config = thinking_config
         self.custom_instructions = custom_instructions
+        self.app_context = app_context
         self.client = httpx.AsyncClient(timeout=60.0)
 
         # Setup cache
@@ -148,6 +150,9 @@ IMPORTANT RULES:
 
             if self.custom_instructions:
                 prompt += f"\n6. {self.custom_instructions}"
+
+            if self.app_context:
+                prompt += f"\n\nApp Context:\n{self.app_context}"
 
             prompt += f"""
 
@@ -317,6 +322,9 @@ IMPORTANT RULES:
         if self.custom_instructions:
             prompt += f"\n5. {self.custom_instructions}"
 
+        if self.app_context:
+            prompt += f"\n\nApp Context:\n{self.app_context}"
+
         prompt += f"\n\nText to translate:\n{text}"
 
         if context:
@@ -347,6 +355,9 @@ CRITICAL RULES:
 
         if self.custom_instructions:
             prompt += f"\n8. {self.custom_instructions}"
+
+        if self.app_context:
+            prompt += f"\n\nApp Context:\n{self.app_context}"
 
         prompt += f"\n\nTexts to translate:\n{batch_text}"
 

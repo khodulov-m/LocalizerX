@@ -20,6 +20,7 @@ from localizerx.io.xcstrings import read_xcstrings, write_xcstrings
 from localizerx.parser.model import Translation
 from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
+from localizerx.utils.context import extract_app_context_string
 from localizerx.utils.locale import (
     get_language_name,
     parse_language_list,
@@ -127,6 +128,13 @@ def translate(
             help="Custom instructions for translation (e.g., 'Do not translate proper names')",
         ),
     ] = None,
+    no_app_context: Annotated[
+        bool,
+        typer.Option(
+            "--no-app-context",
+            help="Disable automatic app context extraction (name, subtitle, description) from metadata or project files.",
+        ),
+    ] = False,
 ) -> None:
     """Translate an .xcstrings file to target languages.
 
@@ -145,6 +153,7 @@ def translate(
         model=model,
         temperature=temperature,
         custom_prompt=custom_prompt,
+        no_app_context=no_app_context,
     )
 
 
@@ -161,6 +170,7 @@ def _run_translate(
     model: str | None,
     temperature: float | None,
     custom_prompt: str | None,
+    no_app_context: bool,
 ) -> None:
     """Core translation logic."""
     # Load configuration
@@ -239,6 +249,7 @@ def _run_translate(
             model=model,
             temperature=temperature,
             custom_prompt=custom_prompt,
+            no_app_context=no_app_context,
         )
 
 
@@ -316,6 +327,7 @@ def _process_file(
     model: str | None,
     temperature: float | None,
     custom_prompt: str | None,
+    no_app_context: bool,
 ) -> None:
     """Process a single xcstrings file."""
     console.print(f"[bold]Processing:[/bold] {file_path}")
@@ -371,6 +383,7 @@ def _process_file(
             model=model,
             temperature=temperature,
             custom_prompt=custom_prompt,
+            no_app_context=no_app_context,
         )
     )
 
@@ -412,6 +425,7 @@ async def _translate_file(
     model: str | None,
     temperature: float | None,
     custom_prompt: str | None,
+    no_app_context: bool,
 ) -> None:
     """Perform translations and update catalog."""
     cache_dir = get_cache_dir(config)
@@ -420,6 +434,12 @@ async def _translate_file(
     actual_temperature = temperature if temperature is not None else config.translator.temperature
     actual_custom_instructions = custom_prompt or config.translator.custom_instructions
 
+    app_context = None
+    if config.translator.use_app_context and not no_app_context:
+        app_context = extract_app_context_string(source_lang)
+        if app_context:
+            console.print("[dim]Using extracted app context for translations[/dim]")
+
     async with GeminiTranslator(
         model=actual_model,
         batch_size=actual_batch_size,
@@ -427,6 +447,7 @@ async def _translate_file(
         cache_dir=cache_dir,
         temperature=actual_temperature,
         custom_instructions=actual_custom_instructions,
+        app_context=app_context,
     ) as translator:
         all_translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]] = (
             {}

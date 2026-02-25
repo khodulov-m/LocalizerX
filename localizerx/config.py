@@ -49,6 +49,7 @@ class TranslatorConfig(BaseModel):
     max_retries: int = Field(default=3, ge=1, le=10)
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
     custom_instructions: str | None = None
+    use_app_context: bool = Field(default=True, description="Automatically extract and use app context from fastlane metadata or Xcode projects in translation prompts.")
     screenshots: ScreenshotsConfig = Field(default_factory=ScreenshotsConfig)
 
 

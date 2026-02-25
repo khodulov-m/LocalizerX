@@ -135,6 +135,21 @@ def main(
             max=2.0,
         ),
     ] = None,
+    custom_prompt: Annotated[
+        Optional[str],
+        typer.Option(
+            "--custom-prompt",
+            "--instructions",
+            help="Custom instructions for translation (e.g., 'Do not translate proper names')",
+        ),
+    ] = None,
+    no_app_context: Annotated[
+        bool,
+        typer.Option(
+            "--no-app-context",
+            help="Disable automatic app context extraction (name, subtitle, description) from metadata or project files.",
+        ),
+    ] = False,
 ) -> None:
     """LocalizerX - Translate Xcode String Catalogs using Gemini API.
 
@@ -155,6 +170,8 @@ def main(
             batch_size=batch_size,
             model=model,
             temperature=temperature,
+            custom_prompt=custom_prompt,
+            no_app_context=no_app_context,
         )
     elif ctx.invoked_subcommand is None:
         # No subcommand and no --to, show help
