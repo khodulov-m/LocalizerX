@@ -252,6 +252,13 @@ def screenshots_generate(
             help="Source language for the generated texts (default: en)",
         ),
     ] = "en",
+    auto: Annotated[
+        Optional[int],
+        typer.Option(
+            "--auto",
+            help="Automatically generate N screenshot texts (e.g., --auto 5)",
+        ),
+    ] = None,
 ) -> None:
     """Generate marketing-optimized screenshot texts using Gemini AI.
 
@@ -261,6 +268,7 @@ def screenshots_generate(
     Two modes:
     - Interactive: prompts for screen descriptions one by one
     - Hints file: reads descriptions from a JSON file (--hints)
+    - Auto: generates N texts automatically (--auto N)
 
     Examples:
 
@@ -269,6 +277,9 @@ def screenshots_generate(
 
         # From hints file
         localizerx screenshots-generate --hints hints.json
+
+        # Auto generate 5 headlines
+        localizerx screenshots-generate --auto 5
 
         # Generate only headlines
         localizerx screenshots-generate --text-types headline
@@ -287,6 +298,7 @@ def screenshots_generate(
         backup=backup,
         model=model,
         src_lang=src,
+        auto=auto,
     )
 
 
@@ -301,6 +313,7 @@ def _run_screenshots_generate(
     backup: bool,
     model: str | None,
     src_lang: str,
+    auto: int | None = None,
 ) -> None:
     """Core screenshots generation logic."""
     from localizerx.io.metadata import detect_metadata_path, read_metadata
@@ -332,8 +345,11 @@ def _run_screenshots_generate(
             console.print("[red]Error:[/red] No valid text types specified")
             raise typer.Exit(1)
     else:
-        # Default: headline and subtitle
-        types_to_generate = [ScreenshotTextType.HEADLINE, ScreenshotTextType.SUBTITLE]
+        # Default: headline and subtitle, or just headline if auto is set
+        if auto is not None:
+            types_to_generate = [ScreenshotTextType.HEADLINE]
+        else:
+            types_to_generate = [ScreenshotTextType.HEADLINE, ScreenshotTextType.SUBTITLE]
 
     # Detect or read metadata for app context
     if metadata_path is None:
@@ -378,6 +394,9 @@ def _run_screenshots_generate(
         except (FileNotFoundError, ValueError) as e:
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
+    elif auto is not None:
+        screen_hints = {f"screen_{i+1}": f"Key feature {i+1} of the app" for i in range(auto)}
+        console.print(f"[green]Auto-generated {auto} screen hints[/green]")
     else:
         # Interactive mode
         screen_hints = _interactive_screen_hints()
@@ -497,12 +516,22 @@ def _show_generation_dry_run(
     tasks: list[tuple[str, str, str, str]],
 ) -> None:
     """Show generation prompts for dry run."""
-    from localizerx.translator.screenshots_generation_prompts import build_generation_prompt
+    from localizerx.translator.screenshots_generation_prompts import (
+        build_batch_generation_prompt,
+        build_generation_prompt,
+    )
 
     console.print("\n[bold]Prompts that would be sent:[/bold]\n")
 
-    # Show first few prompts
-    for i, (screen_id, text_type, device_class, hint) in enumerate(tasks[:3]):
+    if not tasks:
+        return
+
+    # Show the first batch prompt
+    batch_size = 10  # For display purposes
+    batch = tasks[:batch_size]
+
+    if len(batch) == 1:
+        screen_id, text_type, device_class, hint = batch[0]
         prompt = build_generation_prompt(
             app_context=app_context,
             screen_id=screen_id,
@@ -510,19 +539,25 @@ def _show_generation_dry_run(
             device_class=device_class,
             user_hint=hint,
         )
+        console.print(f"[cyan]--- Single Text Generation ({screen_id}) ---[/cyan]")
+    else:
+        prompt = build_batch_generation_prompt(
+            app_context=app_context,
+            items=batch,
+        )
+        console.print(f"[cyan]--- Batch Generation ({len(batch)} items) ---[/cyan]")
 
-        header = f"{screen_id} / {text_type.value} / {device_class.value}"
-        console.print(f"[cyan]--- {header} ---[/cyan]")
-        # Show truncated prompt
-        lines = prompt.split("\n")
-        preview_lines = lines[:15]
-        console.print("\n".join(preview_lines))
-        if len(lines) > 15:
-            console.print(f"[dim]... ({len(lines) - 15} more lines)[/dim]")
-        console.print()
+    # Show truncated prompt
+    lines = prompt.split("\n")
+    preview_lines = lines[:25]
+    console.print("\n".join(preview_lines), markup=False)
+    if len(lines) > 25:
+        console.print(f"[dim]... ({len(lines) - 25} more lines)[/dim]")
+    console.print()
 
-    if len(tasks) > 3:
-        console.print(f"[dim]... and {len(tasks) - 3} more prompts[/dim]")
+    if len(tasks) > batch_size:
+        remaining = len(tasks) - batch_size
+        console.print(f"[dim]... and {remaining} more items in subsequent batches[/dim]")
 
 
 async def _generate_screenshots(
@@ -537,19 +572,24 @@ async def _generate_screenshots(
 ) -> None:
     """Perform screenshot text generation and update file."""
     from localizerx.io.screenshots import write_screenshots
-    from localizerx.translator.screenshots_generation_prompts import build_generation_prompt
+    from localizerx.translator.screenshots_generation_prompts import (
+        build_batch_generation_prompt,
+        build_generation_prompt,
+    )
+    from localizerx.translator.screenshots_prompts import parse_batch_screenshot_response
 
     ss_cfg = config.translator.screenshots
     cache_dir = get_cache_dir(config)
     actual_model = model or ss_cfg.model
     thinking_config = {"thinkingLevel": ss_cfg.thinking_level}
 
+    batch_size = ss_cfg.batch_size
+
     # {(screen_id, text_type, device_class): generated_text}
     all_generations: dict[tuple, str] = {}
 
     async with GeminiTranslator(
         model=actual_model,
-        batch_size=1,
         max_retries=config.translator.max_retries,
         cache_dir=cache_dir,
         temperature=ss_cfg.temperature,
@@ -560,28 +600,54 @@ async def _generate_screenshots(
         with create_progress() as progress:
             task = progress.add_task("Generating", total=len(generation_tasks))
 
-            for screen_id, text_type, device_class, hint in generation_tasks:
-                # Build generation prompt
-                prompt = build_generation_prompt(
-                    app_context=app_context,
-                    screen_id=screen_id,
-                    text_type=text_type,
-                    device_class=device_class,
-                    user_hint=hint,
-                )
+            for batch_start in range(0, len(generation_tasks), batch_size):
+                batch = generation_tasks[batch_start : batch_start + batch_size]
 
                 try:
-                    generated = await translator._call_api(prompt)
-                    generated = generated.strip()
-                except Exception as e:
-                    console.print(
-                        f"  [red]Error generating {screen_id}/{text_type.value}: {e}[/red]"
-                    )
-                    progress.advance(task)
-                    continue
+                    if len(batch) == 1:
+                        screen_id, text_type, device_class, hint = batch[0]
+                        # Get previously generated texts for this type and device class
+                        previous_texts = [
+                            text for (prev_sid, prev_tt, prev_dc), text in all_generations.items()
+                            if prev_tt == text_type and prev_dc == device_class
+                        ]
+                        prompt = build_generation_prompt(
+                            app_context=app_context,
+                            screen_id=screen_id,
+                            text_type=text_type,
+                            device_class=device_class,
+                            user_hint=hint,
+                            previous_texts=previous_texts if previous_texts else None,
+                        )
+                        response = await translator._call_api(prompt)
+                        generations = [response.strip()]
+                    else:
+                        # Collect all previous texts from earlier batches
+                        previous_texts = [text for text in all_generations.values()]
+                        
+                        prompt = build_batch_generation_prompt(
+                            app_context=app_context,
+                            items=batch,
+                            previous_texts=previous_texts if previous_texts else None,
+                        )
+                        response = await translator._call_api(prompt)
+                        generations = parse_batch_screenshot_response(
+                            response, len(batch)
+                        )
 
-                all_generations[(screen_id, text_type, device_class)] = generated
-                progress.advance(task)
+                    for (screen_id, text_type, device_class, _), generated in zip(
+                        batch, generations
+                    ):
+                        if generated:
+                            all_generations[(screen_id, text_type, device_class)] = generated
+
+                except Exception as e:
+                    items_str = ", ".join(f"{sid}/{tt.value}" for sid, tt, _, _ in batch)
+                    console.print(
+                        f"  [red]Error generating batch [{items_str}]: {e}[/red]"
+                    )
+
+                progress.advance(task, advance=len(batch))
 
     if not all_generations:
         console.print("[red]No texts were generated[/red]")

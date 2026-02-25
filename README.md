@@ -326,6 +326,9 @@ Automatically generate marketing-optimized screenshot texts using AI. The comman
 # Interactive mode - prompts for screen descriptions
 localizerx screenshots-generate
 
+# Auto generate N texts (defaults to generating only headlines)
+localizerx screenshots-generate --auto 5
+
 # From hints file (JSON with screen descriptions)
 localizerx screenshots-generate --hints hints.json
 
@@ -372,10 +375,21 @@ Generating texts...
 }
 ```
 
+**Auto Mode:**
+
+When run with `--auto N`, the command automatically generates `N` screenshot texts using default hints. The `text-types` parameter defaults to `headline` only unless explicitly specified.
+
+```
+$ localizerx screenshots-generate --auto 5
+Auto-generated 5 screen hints
+...
+```
+
 ### Screenshots Generate Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
+| `--auto` | | Automatically generate N screenshot texts |
 | `--hints` | | Path to JSON file with screen descriptions |
 | `--metadata` | | Path to fastlane/metadata (auto-detected if omitted) |
 | `--text-types` | | Text types to generate (comma-separated, default: `headline,subtitle`) |
@@ -623,6 +637,9 @@ localizerx metadata --to es-ES --fields keywords --on-limit truncate
 ```bash
 # Generate texts interactively (prompts for screen descriptions)
 localizerx screenshots-generate
+
+# Auto generate N texts (defaults to generating only headlines)
+localizerx screenshots-generate --auto 5
 
 # Generate from a hints file with screen descriptions
 localizerx screenshots-generate --hints hints.json

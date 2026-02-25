@@ -16,6 +16,7 @@ def build_generation_prompt(
     text_type: ScreenshotTextType,
     device_class: DeviceClass,
     user_hint: str | None = None,
+    previous_texts: list[str] | None = None,
 ) -> str:
     """
     Build an ASO-optimized prompt for generating screenshot text.
@@ -26,6 +27,7 @@ def build_generation_prompt(
         text_type: Type of text to generate (headline, subtitle, etc.)
         device_class: Target device class (small or large)
         user_hint: Optional hint describing what this screen shows
+        previous_texts: Optional list of previously generated texts to avoid repetition
 
     Returns:
         Formatted prompt string for the Gemini API
@@ -47,6 +49,16 @@ TASK: Generate a {text_type.value.upper()} for screenshot "{screen_id}"
 SCREEN DESCRIPTION: {user_hint}
 """
 
+    if previous_texts:
+        # Keep only the most recent ones to avoid context explosion, but enough to prevent repetition
+        recent_texts = previous_texts[-15:]
+        prompt += f"""
+AVOID REPETITION:
+Do not generate the exact same text or use very similar phrasing to these previously generated texts:
+"""
+        for text in recent_texts:
+            prompt += f"- {text}\n"
+
     prompt += f"""
 CRITICAL RULES:
 1. MAXIMUM {SCREENSHOT_TEXT_WORD_LIMIT} WORDS - This is a HARD LIMIT, never exceed
@@ -55,6 +67,7 @@ CRITICAL RULES:
 4. Highlight app benefits, not features
 5. Use action verbs when appropriate
 6. Make it memorable and punchy
+7. Make the text unique and different from previous screens
 
 TEXT TYPE: {text_type.value.upper()}
 {type_guidance}
@@ -106,6 +119,7 @@ def _get_device_guidance(device_class: DeviceClass) -> str:
 def build_batch_generation_prompt(
     app_context: AppContext,
     items: list[tuple[str, ScreenshotTextType, DeviceClass, str | None]],
+    previous_texts: list[str] | None = None,
 ) -> str:
     """
     Build a batch generation prompt for multiple screenshot texts.
@@ -113,6 +127,7 @@ def build_batch_generation_prompt(
     Args:
         app_context: AppContext with app information
         items: List of (screen_id, text_type, device_class, user_hint) tuples
+        previous_texts: Optional list of previously generated texts to avoid repetition
 
     Returns:
         Formatted prompt string for the Gemini API
@@ -137,7 +152,19 @@ APP CONTEXT:
 TASK: Generate {count} screenshot texts for the following:
 
 {items_str}
+"""
 
+    if previous_texts:
+        # Keep only the most recent ones to avoid context explosion
+        recent_texts = previous_texts[-20:]
+        prompt += f"""
+AVOID REPETITION:
+Do not generate the exact same text or use very similar phrasing to these previously generated texts:
+"""
+        for text in recent_texts:
+            prompt += f"- {text}\n"
+
+    prompt += f"""
 CRITICAL RULES (MUST FOLLOW FOR ALL):
 1. MAXIMUM {SCREENSHOT_TEXT_WORD_LIMIT} WORDS per text - HARD LIMIT
 2. Be compelling and marketing-focused
@@ -145,6 +172,7 @@ CRITICAL RULES (MUST FOLLOW FOR ALL):
 4. Use action verbs when appropriate
 5. [SHORT] items should be extra concise for small screens
 6. Make each text unique and memorable
+7. Make sure generated texts are different from each other and from the previous texts.
 
 Provide numbered results. Each must be {SCREENSHOT_TEXT_WORD_LIMIT} words max:"""
 
