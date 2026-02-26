@@ -784,7 +784,9 @@ async def _translate_metadata(
     semaphore = asyncio.Semaphore(5)
 
     thinking_level = getattr(config.translator, "thinking_level", "0")
-    thinking_config = {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    thinking_config = (
+        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    )
 
     async with GeminiTranslator(
         thinking_config=thinking_config,
@@ -898,6 +900,29 @@ async def _translate_metadata(
             backup=backup,
             locales=list(all_translations.keys()),
         )
+
+        # Copy untranslatable files from source locale to target locales
+        import shutil
+
+        untranslatable_files = [
+            "marketing_url.txt",
+            "privacy_url.txt",
+            "support_url.txt",
+            "apple_tv_privacy_policy.txt",
+        ]
+        source_dir = path / source_locale
+        if source_dir.exists():
+            for target_locale in all_translations.keys():
+                target_dir = path / target_locale
+                target_dir.mkdir(parents=True, exist_ok=True)
+                for filename in untranslatable_files:
+                    src_file = source_dir / filename
+                    if src_file.exists():
+                        dst_file = target_dir / filename
+                        if backup and dst_file.exists():
+                            backup_path = dst_file.with_suffix(".txt.backup")
+                            shutil.copy2(dst_file, backup_path)
+                        shutil.copy2(src_file, dst_file)
 
         console.print(f"\n[green]Saved translations to {path}[/green]")
 
