@@ -186,6 +186,17 @@ localizerx metadata --to de-DE --on-limit truncate
 | `--model` | `-m` | Gemini model to use |
 | `--temperature` | `-T` | Sampling temperature (0.0–2.0). Lower = more deterministic. |
 
+**Note:** The `metadata` command also automatically copies `marketing_url.txt`, `privacy_url.txt`, `support_url.txt`, and `apple_tv_privacy_policy.txt` from the source locale to all translated target locales in their original form.
+
+### Set Metadata URLs
+
+Set URL files for all existing locales in fastlane metadata:
+
+```bash
+# Set marketing, privacy, and support URLs across all localized folders
+localizerx metadata-urls --marketing "https://example.com" --privacy "https://example.com/privacy" --support "https://example.com/support"
+```
+
 ### Check Metadata Character Limits & ASO Optimization
 
 Validate that your App Store metadata fields comply with Apple's character limits and check for ASO optimization issues:
@@ -630,6 +641,9 @@ localizerx metadata --to de-DE,fr-FR,ja
 
 # Translate only keywords with truncation if over limit
 localizerx metadata --to es-ES --fields keywords --on-limit truncate
+
+# Set metadata URLs across locales
+localizerx metadata-urls --marketing "https://example.com" --support "https://example.com/support"
 ```
 
 ### Screenshot Texts Generation

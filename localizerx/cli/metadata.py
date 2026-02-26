@@ -959,3 +959,72 @@ def _show_metadata_preview(source, all_translations: dict) -> None:
         table.add_row("...", "", f"({total - 20} more)", "")
 
     console.print(table)
+
+
+def metadata_urls(
+    path: Annotated[
+        Optional[Path],
+        typer.Argument(
+            help="Path to fastlane metadata directory (auto-detected if omitted)",
+        ),
+    ] = None,
+    marketing: Annotated[
+        Optional[str],
+        typer.Option("--marketing", help="URL for marketing_url.txt"),
+    ] = None,
+    privacy: Annotated[
+        Optional[str],
+        typer.Option("--privacy", help="URL for privacy_url.txt"),
+    ] = None,
+    support: Annotated[
+        Optional[str],
+        typer.Option("--support", help="URL for support_url.txt"),
+    ] = None,
+    apple_tv_privacy: Annotated[
+        Optional[str],
+        typer.Option("--apple-tv-privacy", help="URL for apple_tv_privacy_policy.txt"),
+    ] = None,
+) -> None:
+    """Set URL files for all existing locales in fastlane metadata."""
+    from localizerx.io.metadata import detect_metadata_path, get_available_locales
+
+    if path is None:
+        path = detect_metadata_path()
+        if path is None:
+            console.print("[red]Error:[/red] No metadata directory found")
+            console.print("Run from a directory with fastlane/metadata or specify path")
+            raise typer.Exit(1)
+
+    if not path.exists():
+        console.print(f"[red]Error:[/red] Path does not exist: {path}")
+        raise typer.Exit(1)
+
+    urls = {}
+    if marketing is not None:
+        urls["marketing_url.txt"] = marketing
+    if privacy is not None:
+        urls["privacy_url.txt"] = privacy
+    if support is not None:
+        urls["support_url.txt"] = support
+    if apple_tv_privacy is not None:
+        urls["apple_tv_privacy_policy.txt"] = apple_tv_privacy
+
+    if not urls:
+        console.print(
+            "[yellow]No URLs specified. Use --marketing, --privacy, "
+            "--support, or --apple-tv-privacy.[/yellow]"
+        )
+        raise typer.Exit(0)
+
+    locales = get_available_locales(path)
+    if not locales:
+        console.print("[red]No locales found in metadata directory.[/red]")
+        raise typer.Exit(1)
+
+    for locale in locales:
+        locale_dir = path / locale
+        for filename, url in urls.items():
+            file_path = locale_dir / filename
+            file_path.write_text(url + "\n", encoding="utf-8")
+
+    console.print(f"[green]Successfully updated URLs for {len(locales)} locales in {path}[/green]")

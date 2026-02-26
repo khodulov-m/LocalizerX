@@ -73,6 +73,12 @@ localizerx metadata-check examples/metadata --locale en-US
 localizerx metadata-check examples/metadata --skip-duplicates
 ```
 
+### Set URLs across locales
+
+```bash
+localizerx metadata-urls examples/metadata --marketing "https://example.com" --support "https://example.com/support"
+```
+
 ### View metadata info
 
 ```bash
