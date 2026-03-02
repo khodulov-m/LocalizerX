@@ -266,3 +266,70 @@ class TestDetectI18nPath:
         file_path = flat_locales_dir / "en.json"
         with pytest.raises(ValueError):
             read_i18n(file_path)
+
+    def test_detect_deep_locales(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            locales_dir = tmpdir / "apps" / "web" / "src" / "i18n" / "locales"
+            locales_dir.mkdir(parents=True)
+            (locales_dir / "en.json").write_text('{"hello": "Hello"}')
+
+            result = detect_i18n_path(tmpdir)
+            assert result == locales_dir
+
+
+class TestIndexTsGeneration:
+    def test_index_ts_flat(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            locales_dir = Path(tmpdir) / "locales"
+            locales_dir.mkdir()
+            (locales_dir / "en.json").write_text('{"h": "H"}')
+            (locales_dir / "fr.json").write_text('{"h": "B"}')
+
+            catalog = read_i18n(locales_dir)
+            write_i18n(catalog, locales_dir)
+
+            index_ts = locales_dir / "index.ts"
+            assert index_ts.exists()
+            content = index_ts.read_text()
+            assert 'import en from "./en.json";' in content
+            assert 'import fr from "./fr.json";' in content
+            assert '"en": en,' in content
+
+    def test_index_ts_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            locales_dir = Path(tmpdir) / "locales"
+            locales_dir.mkdir()
+            en_dir = locales_dir / "en"
+            en_dir.mkdir()
+            (en_dir / "translation.json").write_text('{"h": "H"}')
+            fr_dir = locales_dir / "fr"
+            fr_dir.mkdir()
+            (fr_dir / "translation.json").write_text('{"h": "B"}')
+
+            catalog = read_i18n(locales_dir)
+            write_i18n(catalog, locales_dir)
+
+            index_ts = locales_dir / "index.ts"
+            assert index_ts.exists()
+            content = index_ts.read_text()
+            assert 'import en from "./en/translation.json";' in content
+            assert 'import fr from "./fr/translation.json";' in content
+            assert '"en": en,' in content
+
+    def test_index_ts_sanitized_names(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            locales_dir = Path(tmpdir) / "locales"
+            locales_dir.mkdir()
+            (locales_dir / "en-US.json").write_text('{"h": "H"}')
+            (locales_dir / "pt-BR.json").write_text('{"h": "B"}')
+
+            catalog = read_i18n(locales_dir)
+            write_i18n(catalog, locales_dir)
+
+            index_ts = locales_dir / "index.ts"
+            content = index_ts.read_text()
+            assert 'import enUS from "./en-US.json";' in content
+            assert 'import ptBR from "./pt-BR.json";' in content
+            assert '"en-US": enUS,' in content
+            assert '"pt-BR": ptBR,' in content

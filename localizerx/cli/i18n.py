@@ -90,6 +90,13 @@ def i18n_translate(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    update_index: Annotated[
+        bool,
+        typer.Option(
+            "--index/--no-index",
+            help="Automatically update index.ts with locale imports",
+        ),
+    ] = True,
 ) -> None:
     """Translate frontend i18n JSON files to target locales."""
     if not to:
@@ -106,6 +113,7 @@ def i18n_translate(
         backup=backup,
         batch_size=batch_size,
         model=model,
+        update_index=update_index,
     )
 
 
@@ -138,9 +146,15 @@ def i18n_info(
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
 
+    index_ts = path / "index.ts"
+    index_status = (
+        "[green]Present[/green]" if index_ts.exists() else "[yellow]Missing[/yellow]"
+    )
+
     console.print(f"[bold]Locales Directory:[/bold] {path}")
     console.print(f"[bold]Source Locale:[/bold] {catalog.source_locale}")
     console.print(f"[bold]Total Locales:[/bold] {catalog.locale_count}")
+    console.print(f"[bold]index.ts Status:[/bold] {index_status}")
     console.print()
 
     source = catalog.get_source_locale()
@@ -179,9 +193,10 @@ def _run_i18n_translate(
     backup: bool,
     batch_size: int | None,
     model: str | None,
+    update_index: bool = True,
 ) -> None:
     """Core i18n translation logic."""
-    from localizerx.io.i18n import detect_i18n_path, read_i18n
+    from localizerx.io.i18n import detect_i18n_path, read_i18n, update_index_ts
 
     config = load_config()
 
@@ -234,6 +249,9 @@ def _run_i18n_translate(
 
     if not translation_tasks:
         console.print("[green]All messages already translated[/green]")
+        if update_index:
+            update_index_ts(path, catalog)
+            console.print(f"[green]Updated {path}/index.ts[/green]")
         return
 
     for locale, msgs in translation_tasks.items():
@@ -255,6 +273,7 @@ def _run_i18n_translate(
             backup=backup,
             batch_size=batch_size,
             model=model,
+            update_index=update_index,
         )
     )
 
@@ -287,6 +306,7 @@ async def _translate_i18n(
     backup: bool,
     batch_size: int | None,
     model: str | None,
+    update_index: bool = True,
 ) -> None:
     """Perform i18n translations and update catalog."""
     from localizerx.io.i18n import write_i18n
@@ -342,6 +362,7 @@ async def _translate_i18n(
             path,
             backup=backup,
             locales=list(all_translations.keys()),
+            update_index=update_index,
         )
 
         console.print(f"\n[green]Saved translations to {path}[/green]")

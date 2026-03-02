@@ -49,6 +49,7 @@ def write_i18n(
     path: Path,
     backup: bool = False,
     locales: list[str] | None = None,
+    update_index: bool = True,
 ) -> None:
     """
     Write i18n catalog to the locales directory.
@@ -60,6 +61,7 @@ def write_i18n(
         path: Path to the locales directory
         backup: Whether to create backups of existing files
         locales: Specific locales to write (None = all non-source locales)
+        update_index: Whether to update index.ts (default: True)
     """
     path.mkdir(parents=True, exist_ok=True)
 
@@ -101,14 +103,51 @@ def write_i18n(
             json.dump(output, f, ensure_ascii=False, indent=2)
             f.write("\n")
 
+    if update_index:
+        update_index_ts(path, catalog)
+
+
+def update_index_ts(path: Path, catalog: I18nCatalog) -> None:
+    """
+    Update index.ts in the locales directory with current locales.
+
+    Generates TypeScript imports and exports for all locales in the catalog.
+    """
+    index_path = path / "index.ts"
+    layout = _detect_layout(path)
+
+    imports = []
+    exports = []
+
+    for locale_code in sorted(catalog.locales.keys()):
+        # Sanitize variable name for import (e.g. en-US -> enUS)
+        var_name = locale_code.replace("-", "").replace("_", "")
+
+        if layout == "dir":
+            filename = _find_json_filename(path, catalog.source_locale)
+            imports.append(f"import {var_name} from \"./{locale_code}/{filename}\";")
+        else:
+            imports.append(f"import {var_name} from \"./{locale_code}.json\";")
+
+        exports.append(f"  \"{locale_code}\": {var_name},")
+
+    lines = (
+        imports
+        + [""]
+        + ["export default {"]
+        + exports
+        + ["} as const;", ""]
+    )
+
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
 
 def detect_i18n_path(start_path: Path | None = None) -> Path | None:
     """
     Auto-detect i18n locales directory.
 
-    Searches in common locations:
-    - ./locales, ./src/locales, ./i18n, ./src/i18n
-    - ./public/locales, ./assets/locales, ./lang
+    Searches in common locations first, then performs a recursive search.
 
     Args:
         start_path: Starting directory (default: current working directory)
@@ -119,6 +158,7 @@ def detect_i18n_path(start_path: Path | None = None) -> Path | None:
     if start_path is None:
         start_path = Path.cwd()
 
+    # Common explicit candidates (fast check)
     candidates = [
         start_path / "locales",
         start_path / "src" / "locales",
@@ -133,6 +173,28 @@ def detect_i18n_path(start_path: Path | None = None) -> Path | None:
         if candidate.exists() and candidate.is_dir():
             if _detect_layout(candidate) is not None:
                 return candidate
+
+    # Recursive search if not found in common locations
+    ignore_dirs = {
+        ".git",
+        "node_modules",
+        "venv",
+        ".venv",
+        "build",
+        "dist",
+        "__pycache__",
+        "target",
+    }
+    search_names = {"locales", "i18n", "lang"}
+
+    for path in start_path.rglob("*"):
+        if path.is_dir() and path.name in search_names:
+            # Skip if any parent is in ignore_dirs
+            if any(p.name in ignore_dirs for p in path.parents):
+                continue
+
+            if _detect_layout(path) is not None:
+                return path
 
     return None
 

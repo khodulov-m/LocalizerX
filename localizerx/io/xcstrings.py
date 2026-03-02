@@ -17,7 +17,8 @@ def read_xcstrings(path: Path) -> StringCatalog:
     Preserves the original JSON structure for lossless round-trip writes.
     """
     with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        content = f.read()
+        data = json.loads(content)
 
     source_language = data.get("sourceLanguage", "en")
     version = data.get("version", "1.0")
@@ -34,7 +35,30 @@ def read_xcstrings(path: Path) -> StringCatalog:
         version=version,
     )
     catalog.set_raw_data(data)
+    _apply_formatting_to_catalog(content, catalog)
     return catalog
+
+
+def _apply_formatting_to_catalog(content: str, catalog: StringCatalog) -> None:
+    """Detect and set formatting (indent and separators) from the original file content."""
+    import re
+
+    # Detect indentation
+    indent = 2
+    match = re.search(r"\n(\s+)\"", content)
+    if match:
+        indent_str = match.group(1)
+        if indent_str:
+            indent = len(indent_str)
+
+    # Detect key-value separator
+    separators = (",", ": ")
+    # Look for the first key-value separator pattern: "key" : "value" or "key" : {
+    sep_match = re.search(r'"[^"]+"(\s*:\s*)["{]', content)
+    if sep_match:
+        separators = (",", sep_match.group(1))
+
+    catalog.set_formatting(indent, separators)
 
 
 def _parse_entry(key: str, data: dict[str, Any], source_language: str) -> Entry:
@@ -142,9 +166,19 @@ def write_xcstrings(
         for lang, translation in entry.translations.items():
             entry_data["localizations"][lang] = translation.to_xcstrings_dict()
 
+    # Get formatting from catalog
+    indent, separators = catalog.get_formatting()
+
     # Write with consistent formatting
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=False)
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=indent,
+            separators=separators,
+            sort_keys=False,
+        )
         f.write("\n")  # Trailing newline
 
 
