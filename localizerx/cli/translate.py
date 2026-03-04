@@ -142,6 +142,14 @@ def translate(
             help="Automatically add translations for new strings and delete stale strings.",
         ),
     ] = False,
+    remove: Annotated[
+        Optional[str],
+        typer.Option(
+            "--remove",
+            "-r",
+            help="Languages to remove (comma-separated, e.g., 'fr,de').",
+        ),
+    ] = None,
 ) -> None:
     """Translate an .xcstrings file to target languages.
 
@@ -162,6 +170,7 @@ def translate(
         custom_prompt=custom_prompt,
         no_app_context=no_app_context,
         refresh=refresh,
+        remove=remove,
     )
 
 
@@ -180,28 +189,37 @@ def _run_translate(
     custom_prompt: str | None,
     no_app_context: bool,
     refresh: bool,
+    remove: str | None = None,
 ) -> None:
     """Core translation logic."""
     # Load configuration
     config = load_config(config_path)
 
     # Parse target languages (use config defaults if not specified)
+    target_langs = []
     if to:
         target_langs = parse_language_list(to)
-    else:
+    elif not remove:
         target_langs = config.default_targets.copy()
         if target_langs:
             console.print(
                 f"[dim]Using default targets from config ({len(target_langs)} languages)[/dim]"
             )
 
-    if not target_langs:
-        console.print("[red]Error:[/red] No target languages specified")
-        console.print("Use --to option or set default_targets in config.toml")
+    # Parse languages to remove
+    remove_langs = []
+    if remove:
+        remove_langs = parse_language_list(remove)
+
+    if not target_langs and not remove_langs:
+        console.print("[red]Error:[/red] No target languages or languages to remove specified")
+        console.print("Use --to or --remove option")
         raise typer.Exit(1)
 
     # Validate languages
-    invalid_langs = [lang for lang in target_langs if not validate_language_code(lang)]
+    invalid_langs = [
+        lang for lang in target_langs + remove_langs if not validate_language_code(lang)
+    ]
     if invalid_langs:
         codes = ", ".join(invalid_langs)
         console.print(f"[yellow]Warning:[/yellow] Unrecognized language codes: {codes}")
@@ -239,8 +257,12 @@ def _run_translate(
 
     console.print(f"Found {len(files)} .xcstrings file(s)")
     console.print(f"Source: {get_language_name(src)} ({src})")
-    target_display = ", ".join(f"{get_language_name(lang)} ({lang})" for lang in target_langs)
-    console.print(f"Targets: {target_display}")
+    if target_langs:
+        target_display = ", ".join(f"{get_language_name(lang)} ({lang})" for lang in target_langs)
+        console.print(f"Targets: {target_display}")
+    if remove_langs:
+        remove_display = ", ".join(f"{get_language_name(lang)} ({lang})" for lang in remove_langs)
+        console.print(f"Remove: [red]{remove_display}[/red]")
     console.print()
 
     # Process each file
@@ -249,6 +271,7 @@ def _run_translate(
             file_path=file_path,
             source_lang=src,
             target_langs=target_langs,
+            remove_langs=remove_langs,
             config=config,
             dry_run=dry_run,
             preview=preview,
@@ -328,6 +351,7 @@ def _process_file(
     file_path: Path,
     source_lang: str,
     target_langs: list[str],
+    remove_langs: list[str],
     config: Config,
     dry_run: bool,
     preview: bool,
@@ -346,6 +370,23 @@ def _process_file(
     # Read file
     catalog = read_xcstrings(file_path)
     console.print(f"  Found {len(catalog.strings)} string(s)")
+
+    # Remove languages if requested
+    languages_actually_removed = []
+    if remove_langs:
+        for lang in remove_langs:
+            removed_from_any = False
+            for entry in catalog.strings.values():
+                if lang in entry.translations:
+                    del entry.translations[lang]
+                    removed_from_any = True
+            if removed_from_any:
+                languages_actually_removed.append(lang)
+
+        if languages_actually_removed:
+            console.print(
+                f"  [yellow]Removed {len(languages_actually_removed)} language(s)[/yellow]"
+            )
 
     # Collect entries to translate per language
     translation_tasks: dict[str, list[tuple[str, str, str | None, dict | None]]] = {}
@@ -384,7 +425,7 @@ def _process_file(
             translation_tasks[target_lang] = entries_to_translate
 
     if not translation_tasks:
-        if refresh and stale_keys:
+        if (refresh and stale_keys) or languages_actually_removed:
             if dry_run:
                 console.print("  [yellow]Dry run - no changes made[/yellow]")
                 return

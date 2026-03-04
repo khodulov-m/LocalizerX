@@ -97,10 +97,18 @@ def i18n_translate(
             help="Automatically update index.ts with locale imports",
         ),
     ] = True,
+    remove: Annotated[
+        Optional[str],
+        typer.Option(
+            "--remove",
+            "-r",
+            help="Locales to remove (comma-separated, e.g., 'fr,de').",
+        ),
+    ] = None,
 ) -> None:
     """Translate frontend i18n JSON files to target locales."""
-    if not to:
-        console.print("[red]Error:[/red] --to option is required (e.g., --to fr,es,de)")
+    if not to and not remove:
+        console.print("[red]Error:[/red] --to or --remove option is required")
         raise typer.Exit(1)
 
     _run_i18n_translate(
@@ -114,6 +122,7 @@ def i18n_translate(
         batch_size=batch_size,
         model=model,
         update_index=update_index,
+        remove=remove,
     )
 
 
@@ -194,16 +203,20 @@ def _run_i18n_translate(
     batch_size: int | None,
     model: str | None,
     update_index: bool = True,
+    remove: str | None = None,
 ) -> None:
     """Core i18n translation logic."""
-    from localizerx.io.i18n import detect_i18n_path, read_i18n, update_index_ts
+    from localizerx.io.i18n import (
+        delete_i18n_locale,
+        detect_i18n_path,
+        read_i18n,
+        update_index_ts,
+    )
 
     config = load_config()
 
-    target_locales = parse_language_list(to)
-    if not target_locales:
-        console.print("[red]Error:[/red] No valid target locales specified")
-        raise typer.Exit(1)
+    target_locales = parse_language_list(to) if to else []
+    remove_locales = parse_language_list(remove) if remove else []
 
     # Find locales path
     if path is None:
@@ -216,6 +229,36 @@ def _run_i18n_translate(
     if not path.exists():
         console.print(f"[red]Error:[/red] Path does not exist: {path}")
         raise typer.Exit(1)
+
+    # Handle removal first
+    actually_removed = []
+    if remove_locales:
+        for loc in remove_locales:
+            if loc == src:
+                console.print(f"[yellow]Skipping source locale removal:[/yellow] {loc}")
+                continue
+
+            if dry_run:
+                actually_removed.append(loc)
+                continue
+
+            if delete_i18n_locale(path, loc):
+                actually_removed.append(loc)
+
+        if actually_removed:
+            status = "Would remove" if dry_run else "Removed"
+            console.print(f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] {', '.join(actually_removed)}")
+
+        if not target_locales:
+            if dry_run:
+                console.print("\n[yellow]Dry run - no changes made[/yellow]")
+                return
+            if actually_removed and update_index:
+                # Update index.ts after removal
+                catalog = read_i18n(path, source_locale=src)
+                update_index_ts(path, catalog)
+                console.print(f"[green]Updated {path}/index.ts[/green]")
+            return
 
     try:
         catalog = read_i18n(path, source_locale=src)
@@ -231,8 +274,9 @@ def _run_i18n_translate(
 
     console.print(f"[bold]Locales Directory:[/bold] {path}")
     console.print(f"[bold]Source:[/bold] {get_language_name(src)} ({src})")
-    target_display = ", ".join(f"{get_language_name(loc)} ({loc})" for loc in target_locales)
-    console.print(f"[bold]Targets:[/bold] {target_display}")
+    if target_locales:
+        target_display = ", ".join(f"{get_language_name(loc)} ({loc})" for loc in target_locales)
+        console.print(f"[bold]Targets:[/bold] {target_display}")
     console.print()
 
     # Determine messages to translate per locale

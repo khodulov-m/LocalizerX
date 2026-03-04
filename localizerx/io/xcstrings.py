@@ -162,6 +162,12 @@ def write_xcstrings(
         if "localizations" not in entry_data:
             entry_data["localizations"] = {}
 
+        # Remove languages not present in entry.translations (except source_language)
+        existing_langs = list(entry_data["localizations"].keys())
+        for lang in existing_langs:
+            if lang != catalog.source_language and lang not in entry.translations:
+                del entry_data["localizations"][lang]
+
         # Add/update translations
         for lang, translation in entry.translations.items():
             entry_data["localizations"][lang] = translation.to_xcstrings_dict()

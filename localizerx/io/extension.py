@@ -110,6 +110,24 @@ def write_extension(
         _write_messages_json(path, locale_data, backup)
 
 
+def delete_extension_locale(path: Path, locale_code: str) -> bool:
+    """
+    Delete a Chrome Extension locale directory.
+
+    Args:
+        path: Path to the _locales/ directory
+        locale_code: Standard locale code to delete
+
+    Returns:
+        True if deleted, False if not found
+    """
+    locale_dir = path / locale_code
+    if locale_dir.exists() and locale_dir.is_dir():
+        shutil.rmtree(locale_dir)
+        return True
+    return False
+
+
 def _write_messages_json(
     base_path: Path,
     locale_data: ExtensionLocale,

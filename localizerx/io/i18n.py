@@ -107,6 +107,33 @@ def write_i18n(
         update_index_ts(path, catalog)
 
 
+def delete_i18n_locale(path: Path, locale_code: str) -> bool:
+    """
+    Delete an i18n locale file or directory.
+
+    Args:
+        path: Path to the locales directory
+        locale_code: Standard locale code to delete
+
+    Returns:
+        True if deleted, False if not found
+    """
+    layout = _detect_layout(path)
+
+    if layout == "dir":
+        locale_dir = path / locale_code
+        if locale_dir.exists() and locale_dir.is_dir():
+            shutil.rmtree(locale_dir)
+            return True
+    else:
+        file_path = path / f"{locale_code}.json"
+        if file_path.exists():
+            file_path.unlink()
+            return True
+
+    return False
+
+
 def update_index_ts(path: Path, catalog: I18nCatalog) -> None:
     """
     Update index.ts in the locales directory with current locales.

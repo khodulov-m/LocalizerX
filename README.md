@@ -161,6 +161,20 @@ lox i18n --to es,ja,zh-Hans
 lox android --to fr,de --include-plurals
 ```
 
+### 🧹 Cleaning up Languages
+
+Need to remove some languages from your project? LocalizerX makes it easy:
+
+```bash
+# Remove French, German, and Italian translations from .xcstrings
+lox translate --remove fr,de,it
+
+# Remove specific locales for Android, Chrome, or Frontend i18n
+lox android --remove fr,es
+lox chrome --remove pt-BR
+lox i18n --remove de
+```
+
 ---
 
 ## 🛠️ Handy Options
@@ -168,6 +182,7 @@ lox android --to fr,de --include-plurals
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--to` | `-t` | Target languages (comma-separated). |
+| `--remove` | `-r` | Languages to remove (comma-separated). |
 | `--src` | `-s` | Source language (default: `en`). |
 | `--refresh` | | Add new strings and clean up stale ones automatically. |
 | `--preview` | `-p` | Review translations before they are saved. |

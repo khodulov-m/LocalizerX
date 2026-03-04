@@ -31,6 +31,10 @@ pip install -e .
 # Run CLI
 localizerx translate <path> --to fr,es,de --src en
 
+# Remove languages
+localizerx translate <path> --remove fr,de,it
+localizerx android --remove fr,es
+
 # Translate with custom instructions
 localizerx translate <path> --to fr,es,de --custom-prompt "Do not translate proper names. Do not translate the word 'Water'"
 

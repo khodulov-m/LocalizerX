@@ -150,14 +150,22 @@ def main(
             help="Disable automatic app context extraction (name, subtitle, description) from metadata or project files.",
         ),
     ] = False,
+    remove: Annotated[
+        Optional[str],
+        typer.Option(
+            "--remove",
+            "-r",
+            help="Languages to remove (comma-separated, e.g., 'fr,de').",
+        ),
+    ] = None,
 ) -> None:
     """LocalizerX - Translate Xcode String Catalogs using Gemini API.
 
     Quick usage: localizerx --to ru,fr,de
     Or use default targets: localizerx translate
     """
-    # If no subcommand and --to is provided, run translate
-    if ctx.invoked_subcommand is None and to is not None:
+    # If no subcommand and --to or --remove is provided, run translate
+    if ctx.invoked_subcommand is None and (to is not None or remove is not None):
         translate._run_translate(
             path=None,
             to=to,
@@ -173,6 +181,7 @@ def main(
             custom_prompt=custom_prompt,
             no_app_context=no_app_context,
             refresh=False,
+            remove=remove,
         )
     elif ctx.invoked_subcommand is None:
         # No subcommand and no --to, show help

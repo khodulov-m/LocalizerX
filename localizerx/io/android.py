@@ -116,6 +116,27 @@ def write_android(
         _write_strings_xml(file_path, locale_data)
 
 
+def delete_android_locale(path: Path, locale_code: str) -> bool:
+    """
+    Delete an Android locale directory.
+
+    Args:
+        path: Path to the res/ directory
+        locale_code: Standard locale code to delete
+
+    Returns:
+        True if deleted, False if not found
+    """
+    suffix = standard_to_android_locale(locale_code)
+    dir_name = f"values-{suffix}"
+    values_dir = path / dir_name
+
+    if values_dir.exists() and values_dir.is_dir():
+        shutil.rmtree(values_dir)
+        return True
+    return False
+
+
 def detect_android_path(start_path: Path | None = None) -> Path | None:
     """
     Auto-detect Android res/ directory.

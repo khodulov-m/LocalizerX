@@ -99,10 +99,18 @@ def chrome(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    remove: Annotated[
+        Optional[str],
+        typer.Option(
+            "--remove",
+            "-r",
+            help="Locales to remove (comma-separated, e.g., 'fr,de').",
+        ),
+    ] = None,
 ) -> None:
     """Translate Chrome Extension _locales/ messages to target locales."""
-    if not to:
-        console.print("[red]Error:[/red] --to option is required (e.g., --to fr,de,pt-BR)")
+    if not to and not remove:
+        console.print("[red]Error:[/red] --to or --remove option is required")
         raise typer.Exit(1)
 
     from localizerx.utils.limits import LimitAction
@@ -125,6 +133,7 @@ def chrome(
         overwrite=overwrite,
         backup=backup,
         model=model,
+        remove=remove,
     )
 
 
@@ -234,21 +243,22 @@ def _run_chrome_translate(
     overwrite: bool,
     backup: bool,
     model: str | None,
+    remove: str | None = None,
 ) -> None:
     """Core Chrome Extension translation logic."""
-    from localizerx.io.extension import detect_extension_path, read_extension
+    from localizerx.io.extension import delete_extension_locale, detect_extension_path, read_extension
     from localizerx.parser.extension_model import KNOWN_CWS_KEYS
 
     config = load_config()
 
     # Parse target locales (hyphen -> underscore)
-    target_locales = parse_chrome_locale_list(to)
-    if not target_locales:
-        console.print("[red]Error:[/red] No valid target locales specified")
-        raise typer.Exit(1)
+    target_locales = parse_chrome_locale_list(to) if to else []
+    remove_locales = parse_chrome_locale_list(remove) if remove else []
 
     # Validate locales
-    invalid_locales = [loc for loc in target_locales if not validate_chrome_locale(loc)]
+    invalid_locales = [
+        loc for loc in target_locales + remove_locales if not validate_chrome_locale(loc)
+    ]
     if invalid_locales:
         codes = ", ".join(invalid_locales)
         console.print(f"[yellow]Warning:[/yellow] Unrecognized locale codes: {codes}")
@@ -269,6 +279,30 @@ def _run_chrome_translate(
     if not path.exists():
         console.print(f"[red]Error:[/red] Path does not exist: {path}")
         raise typer.Exit(1)
+
+    # Handle removal first
+    actually_removed = []
+    if remove_locales:
+        for loc in remove_locales:
+            if loc == src:
+                console.print(f"[yellow]Skipping source locale removal:[/yellow] {loc}")
+                continue
+
+            if dry_run:
+                actually_removed.append(loc)
+                continue
+
+            if delete_extension_locale(path, loc):
+                actually_removed.append(loc)
+
+        if actually_removed:
+            status = "Would remove" if dry_run else "Removed"
+            console.print(f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] {', '.join(actually_removed)}")
+
+        if not target_locales:
+            if dry_run:
+                console.print("\n[yellow]Dry run - no changes made[/yellow]")
+            return
 
     # Read catalog
     try:

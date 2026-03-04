@@ -104,10 +104,18 @@ def android_translate(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    remove: Annotated[
+        Optional[str],
+        typer.Option(
+            "--remove",
+            "-r",
+            help="Locales to remove (comma-separated, e.g., 'fr,de').",
+        ),
+    ] = None,
 ) -> None:
     """Translate Android strings.xml files to target locales."""
-    if not to:
-        console.print("[red]Error:[/red] --to option is required (e.g., --to fr,es,de)")
+    if not to and not remove:
+        console.print("[red]Error:[/red] --to or --remove option is required")
         raise typer.Exit(1)
 
     _run_android_translate(
@@ -122,6 +130,7 @@ def android_translate(
         backup=backup,
         batch_size=batch_size,
         model=model,
+        remove=remove,
     )
 
 
@@ -210,16 +219,15 @@ def _run_android_translate(
     backup: bool,
     batch_size: int | None,
     model: str | None,
+    remove: str | None = None,
 ) -> None:
     """Core Android translation logic."""
-    from localizerx.io.android import detect_android_path, read_android
+    from localizerx.io.android import delete_android_locale, detect_android_path, read_android
 
     config = load_config()
 
-    target_locales = parse_language_list(to)
-    if not target_locales:
-        console.print("[red]Error:[/red] No valid target locales specified")
-        raise typer.Exit(1)
+    target_locales = parse_language_list(to) if to else []
+    remove_locales = parse_language_list(remove) if remove else []
 
     # Find res path
     if path is None:
@@ -232,6 +240,30 @@ def _run_android_translate(
     if not path.exists():
         console.print(f"[red]Error:[/red] Path does not exist: {path}")
         raise typer.Exit(1)
+
+    # Handle removal first
+    actually_removed = []
+    if remove_locales:
+        for loc in remove_locales:
+            if loc == src:
+                console.print(f"[yellow]Skipping source locale removal:[/yellow] {loc}")
+                continue
+
+            if dry_run:
+                actually_removed.append(loc)
+                continue
+
+            if delete_android_locale(path, loc):
+                actually_removed.append(loc)
+
+        if actually_removed:
+            status = "Would remove" if dry_run else "Removed"
+            console.print(f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] {', '.join(actually_removed)}")
+
+        if not target_locales:
+            if dry_run:
+                console.print("\n[yellow]Dry run - no changes made[/yellow]")
+            return
 
     try:
         catalog = read_android(path, source_locale=src)
@@ -247,8 +279,9 @@ def _run_android_translate(
 
     console.print(f"[bold]Resource Directory:[/bold] {path}")
     console.print(f"[bold]Source:[/bold] {get_language_name(src)} ({src})")
-    target_display = ", ".join(f"{get_language_name(loc)} ({loc})" for loc in target_locales)
-    console.print(f"[bold]Targets:[/bold] {target_display}")
+    if target_locales:
+        target_display = ", ".join(f"{get_language_name(loc)} ({loc})" for loc in target_locales)
+        console.print(f"[bold]Targets:[/bold] {target_display}")
     console.print()
 
     # Determine what to translate per locale
