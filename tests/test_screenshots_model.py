@@ -1,6 +1,5 @@
 """Tests for screenshot text data models."""
 
-
 from localizerx.parser.screenshots_model import (
     SCREENSHOT_TEXT_WORD_LIMIT,
     DeviceClass,

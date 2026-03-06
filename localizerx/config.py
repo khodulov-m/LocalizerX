@@ -48,9 +48,16 @@ class TranslatorConfig(BaseModel):
     batch_size: int = Field(default=100, ge=1, le=100)
     max_retries: int = Field(default=3, ge=1, le=10)
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
-    thinking_level: str = Field(default="0", description="Thinking budget level (e.g. '0', 'minimal', 'low', 'medium', 'high')")
+    thinking_level: str = Field(
+        default="0",
+        description="Thinking budget level (e.g. '0', 'minimal', 'low', 'medium', 'high')",
+    )
     custom_instructions: str | None = None
-    use_app_context: bool = Field(default=True, description="Automatically extract and use app context from fastlane metadata or Xcode projects in translation prompts.")
+    use_app_context: bool = Field(
+        default=True,
+        description="Automatically extract and use app context from fastlane metadata "
+        "or Xcode projects in translation prompts.",
+    )
     screenshots: ScreenshotsConfig = Field(default_factory=ScreenshotsConfig)
 
 
@@ -192,8 +199,8 @@ max_retries = 3
 # Automatically extract and use app context from fastlane metadata or Xcode projects
 use_app_context = true
 
-# Thinking budget for translation. 
-# Supported by Gemini 2.5 Pro/Flash and thinking-exp models. 
+# Thinking budget for translation.
+# Supported by Gemini 2.5 Pro/Flash and thinking-exp models.
 # NOT supported by Gemini 2.5 Flash-Lite or 1.5 series.
 # Levels: "minimal", "low", "medium", "high" or "0" (disabled).
 thinking_level = "0"

@@ -12,7 +12,9 @@ class TestGeminiAdapterAppContext:
 
     def test_single_translation_prompt_with_app_context(self):
         """Test that app context is added to single text translation prompt."""
-        translator = GeminiTranslator(api_key="fake-key", app_context="- App Name: TestApp\n- Description: A test app")
+        translator = GeminiTranslator(
+            api_key="fake-key", app_context="- App Name: TestApp\n- Description: A test app"
+        )
 
         prompt = translator._build_prompt("Hello", "English", "Russian", context=None)
 

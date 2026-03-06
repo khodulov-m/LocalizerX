@@ -43,7 +43,7 @@ class TestAppContextExtraction:
             subtitle="The best app",
             promo_text="50% off today",
             description="Detailed description goes here.",
-            keywords=["app", "best", "super"]
+            keywords=["app", "best", "super"],
         )
 
         prompt = context.to_prompt_context(max_desc_length=150)
@@ -68,14 +68,12 @@ class TestAppContextExtraction:
 
     def test_to_prompt_context_max_desc_length(self):
         """Test to_prompt_context respects max_desc_length."""
-        context = AppContext(
-            name="SuperApp",
-            description="This is a very long description. " * 20
-        )
+        context = AppContext(name="SuperApp", description="This is a very long description. " * 20)
 
         prompt = context.to_prompt_context(max_desc_length=50)
         assert "- App Name: SuperApp" in prompt
-        # the description line should be relatively short (around 50 + "..." + length of "- Description: ")
+        # the description line should be relatively short (around 50 + "..." + length
+        # of "- Description: ")
         # Let's just check the description line is in the output and ends with ...
         assert "..." in prompt
 
@@ -112,7 +110,9 @@ class TestExtractAppContextString:
         mock_path = MagicMock()
         mock_workspace = MagicMock()
         mock_workspace.stem = "MyWorkspaceApp"
-        mock_path.glob.side_effect = lambda pattern: [mock_workspace] if pattern == "*.xcworkspace" else []
+        mock_path.glob.side_effect = lambda pattern: (
+            [mock_workspace] if pattern == "*.xcworkspace" else []
+        )
         mock_cwd.return_value = mock_path
 
         result = extract_app_context_string()

@@ -14,7 +14,9 @@ class TranslationRequest:
     key: str
     text: str
     comment: str | None = None
-    plural_forms: dict[str, str] | None = None  # For plural variations: {"one": "text", "other": "texts"}
+    plural_forms: dict[str, str] | None = (
+        None  # For plural variations: {"one": "text", "other": "texts"}
+    )
 
 
 @dataclass
@@ -26,7 +28,9 @@ class TranslationResult:
     translated: str
     success: bool = True
     error: str | None = None
-    translated_plurals: dict[str, str] | None = None  # For plural translations: {"one": "translation", "other": "translations"}
+    translated_plurals: dict[str, str] | None = (
+        None  # For plural translations: {"one": "translation", "other": "translations"}
+    )
 
 
 class Translator(ABC):

@@ -608,7 +608,8 @@ async def _generate_screenshots(
                         screen_id, text_type, device_class, hint = batch[0]
                         # Get previously generated texts for this type and device class
                         previous_texts = [
-                            text for (prev_sid, prev_tt, prev_dc), text in all_generations.items()
+                            text
+                            for (prev_sid, prev_tt, prev_dc), text in all_generations.items()
                             if prev_tt == text_type and prev_dc == device_class
                         ]
                         prompt = build_generation_prompt(
@@ -624,16 +625,14 @@ async def _generate_screenshots(
                     else:
                         # Collect all previous texts from earlier batches
                         previous_texts = [text for text in all_generations.values()]
-                        
+
                         prompt = build_batch_generation_prompt(
                             app_context=app_context,
                             items=batch,
                             previous_texts=previous_texts if previous_texts else None,
                         )
                         response = await translator._call_api(prompt)
-                        generations = parse_batch_screenshot_response(
-                            response, len(batch)
-                        )
+                        generations = parse_batch_screenshot_response(response, len(batch))
 
                     for (screen_id, text_type, device_class, _), generated in zip(
                         batch, generations
@@ -643,9 +642,7 @@ async def _generate_screenshots(
 
                 except Exception as e:
                     items_str = ", ".join(f"{sid}/{tt.value}" for sid, tt, _, _ in batch)
-                    console.print(
-                        f"  [red]Error generating batch [{items_str}]: {e}[/red]"
-                    )
+                    console.print(f"  [red]Error generating batch [{items_str}]: {e}[/red]")
 
                 progress.advance(task, advance=len(batch))
 
@@ -930,9 +927,7 @@ async def _translate_screenshots(
                                 tgt_lang=target_lang,
                             )
                             response = await translator._call_api(prompt)
-                            translations = parse_batch_screenshot_response(
-                                response, len(batch)
-                            )
+                            translations = parse_batch_screenshot_response(response, len(batch))
 
                         for (screen_id, text_type, device_class, _), translated in zip(
                             batch, translations
@@ -942,12 +937,8 @@ async def _translate_screenshots(
                                     (screen_id, text_type, device_class)
                                 ] = translated
                     except Exception as e:
-                        items_str = ", ".join(
-                            f"{sid}/{tt.value}" for sid, tt, _, _ in batch
-                        )
-                        console.print(
-                            f"    [red]Error translating batch [{items_str}]: {e}[/red]"
-                        )
+                        items_str = ", ".join(f"{sid}/{tt.value}" for sid, tt, _, _ in batch)
+                        console.print(f"    [red]Error translating batch [{items_str}]: {e}[/red]")
 
                     progress.advance(task, advance=len(batch))
 

@@ -17,22 +17,18 @@ def test_translate_refresh_removes_stale_and_ignores_translated(tmp_path: Path):
         "strings": {
             "hello": {
                 "extractionState": "new",
-                "localizations": {
-                    "en": {"stringUnit": {"state": "translated", "value": "Hello"}}
-                }
+                "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Hello"}}},
             },
             "world": {
                 "extractionState": "stale",
-                "localizations": {
-                    "en": {"stringUnit": {"state": "translated", "value": "World"}}
-                }
+                "localizations": {"en": {"stringUnit": {"state": "translated", "value": "World"}}},
             },
             "translated_key": {
                 "extractionState": "translated",
                 "localizations": {
                     "en": {"stringUnit": {"state": "translated", "value": "Already"}}
-                }
-            }
+                },
+            },
         },
     }
 
@@ -40,15 +36,17 @@ def test_translate_refresh_removes_stale_and_ignores_translated(tmp_path: Path):
     file_path.write_text(json.dumps(sample))
 
     # Run the refresh dry-run first
-    result = runner.invoke(app, ["translate", str(file_path), "--to", "fr", "--refresh", "--dry-run"])
+    result = runner.invoke(
+        app, ["translate", str(file_path), "--to", "fr", "--refresh", "--dry-run"]
+    )
     assert result.exit_code == 0
     assert "Removed 1 stale string(s)" in result.stdout
     assert "Dry run - no changes made" in result.stdout
 
     # Check dry run output
-    assert "hello" in result.stdout # "hello" should be queued for translation
-    assert "world" not in result.stdout # "world" shouldn't be queued
-    assert "translated_key" not in result.stdout # "translated_key" shouldn't be queued
+    assert "hello" in result.stdout  # "hello" should be queued for translation
+    assert "world" not in result.stdout  # "world" shouldn't be queued
+    assert "translated_key" not in result.stdout  # "translated_key" shouldn't be queued
 
 
 def test_translate_refresh_removes_stale_saves_when_no_translations(tmp_path: Path):
@@ -60,17 +58,15 @@ def test_translate_refresh_removes_stale_saves_when_no_translations(tmp_path: Pa
         "strings": {
             "world": {
                 "extractionState": "stale",
-                "localizations": {
-                    "en": {"stringUnit": {"state": "translated", "value": "World"}}
-                }
+                "localizations": {"en": {"stringUnit": {"state": "translated", "value": "World"}}},
             },
             "translated_key": {
                 "extractionState": "translated",
                 "localizations": {
                     "en": {"stringUnit": {"state": "translated", "value": "Already"}},
-                    "fr": {"stringUnit": {"state": "translated", "value": "Déjà"}}
-                }
-            }
+                    "fr": {"stringUnit": {"state": "translated", "value": "Déjà"}},
+                },
+            },
         },
     }
 

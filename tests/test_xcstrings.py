@@ -20,41 +20,22 @@ def sample_xcstrings():
             "hello": {
                 "comment": "Greeting message",
                 "extractionState": "manual",
-                "localizations": {
-                    "en": {
-                        "stringUnit": {
-                            "state": "translated",
-                            "value": "Hello"
-                        }
-                    }
-                }
+                "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Hello"}}},
             },
             "goodbye": {
                 "localizations": {
-                    "en": {
-                        "stringUnit": {
-                            "state": "translated",
-                            "value": "Goodbye"
-                        }
-                    },
-                    "es": {
-                        "stringUnit": {
-                            "state": "translated",
-                            "value": "Adiós"
-                        }
-                    }
+                    "en": {"stringUnit": {"state": "translated", "value": "Goodbye"}},
+                    "es": {"stringUnit": {"state": "translated", "value": "Adiós"}},
                 }
-            }
-        }
+            },
+        },
     }
 
 
 @pytest.fixture
 def xcstrings_file(sample_xcstrings):
     """Create a temporary xcstrings file."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".xcstrings", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".xcstrings", delete=False) as f:
         json.dump(sample_xcstrings, f)
         f.flush()
         yield Path(f.name)

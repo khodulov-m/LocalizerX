@@ -90,12 +90,10 @@ def _get_field_rules(field_type: MetadataFieldType) -> str:
     """Get specific rules for a field type."""
     rules = {
         MetadataFieldType.NAME: (
-            "5. Keep it short and impactful\n"
-            "6. Do not add punctuation unless in original"
+            "5. Keep it short and impactful\n" "6. Do not add punctuation unless in original"
         ),
         MetadataFieldType.SUBTITLE: (
-            "5. Be concise and descriptive\n"
-            "6. Avoid repeating words from the app name"
+            "5. Be concise and descriptive\n" "6. Avoid repeating words from the app name"
         ),
         MetadataFieldType.KEYWORDS: (
             "5. CRITICAL: Keep the comma-separated format exactly\n"
@@ -109,8 +107,7 @@ def _get_field_rules(field_type: MetadataFieldType) -> str:
             "7. Keep feature names if they are product names"
         ),
         MetadataFieldType.PROMOTIONAL_TEXT: (
-            "5. Keep the promotional/marketing tone\n"
-            "6. Be engaging and action-oriented"
+            "5. Keep the promotional/marketing tone\n" "6. Be engaging and action-oriented"
         ),
         MetadataFieldType.RELEASE_NOTES: (
             "5. Maintain bullet points or numbered lists\n"

@@ -23,9 +23,7 @@ def sample_xcstrings():
         "version": "1.0",
         "strings": {
             "hello": {
-                "localizations": {
-                    "en": {"stringUnit": {"state": "translated", "value": "Hello"}}
-                }
+                "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Hello"}}}
             }
         },
     }
@@ -34,9 +32,7 @@ def sample_xcstrings():
 @pytest.fixture
 def temp_xcstrings_file(sample_xcstrings):
     """Create a temporary xcstrings file."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".xcstrings", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".xcstrings", delete=False) as f:
         json.dump(sample_xcstrings, f)
         return Path(f.name)
 
@@ -215,9 +211,7 @@ class TestCLICommands:
     def test_translate_dry_run(self, temp_dir_with_xcstrings):
         """Test translate command with --dry-run."""
         tmpdir, _ = temp_dir_with_xcstrings
-        result = runner.invoke(
-            app, ["translate", str(tmpdir), "--to", "ru", "--dry-run"]
-        )
+        result = runner.invoke(app, ["translate", str(tmpdir), "--to", "ru", "--dry-run"])
         assert result.exit_code == 0
         assert "Found 1 .xcstrings file(s)" in result.stdout
 
@@ -232,9 +226,7 @@ class TestCLICommands:
 
     def test_translate_invalid_path(self):
         """Test translate with non-existent path."""
-        result = runner.invoke(
-            app, ["translate", "/nonexistent/path", "--to", "ru"]
-        )
+        result = runner.invoke(app, ["translate", "/nonexistent/path", "--to", "ru"])
         assert result.exit_code == 1
         assert "does not exist" in result.stdout
 
@@ -258,9 +250,14 @@ class TestCLICommands:
         """Test list command."""
         import os
         from unittest.mock import MagicMock
+
         with patch.dict(os.environ, {"GEMINI_API_KEY": "fake-key"}):
             mock_response = MagicMock()
-            mock_response.json.return_value = {"models": [{"name": "models/fake-model", "supportedGenerationMethods": ["generateContent"]}]}
+            mock_response.json.return_value = {
+                "models": [
+                    {"name": "models/fake-model", "supportedGenerationMethods": ["generateContent"]}
+                ]
+            }
             mock_response.raise_for_status = MagicMock()
             mock_get.return_value = mock_response
 
@@ -305,9 +302,7 @@ class TestAutoDetection:
         assert result.exit_code == 0
         assert "Found 1 .xcstrings file(s)" in result.stdout
 
-    def test_auto_detect_prompts_for_multiple(
-        self, temp_dir_with_multiple_xcstrings, monkeypatch
-    ):
+    def test_auto_detect_prompts_for_multiple(self, temp_dir_with_multiple_xcstrings, monkeypatch):
         """Auto-detect prompts for selection when multiple files found."""
         tmpdir, _ = temp_dir_with_multiple_xcstrings
         monkeypatch.chdir(tmpdir)
@@ -323,9 +318,7 @@ class TestAutoDetection:
             assert result.exit_code == 1
             assert "No .xcstrings files found" in result.stdout
 
-    def test_auto_detect_select_one(
-        self, temp_dir_with_multiple_xcstrings, monkeypatch
-    ):
+    def test_auto_detect_select_one(self, temp_dir_with_multiple_xcstrings, monkeypatch):
         """Select one file when multiple are found."""
         tmpdir, files = temp_dir_with_multiple_xcstrings
         monkeypatch.chdir(tmpdir)
@@ -333,9 +326,7 @@ class TestAutoDetection:
         assert result.exit_code == 0
         assert "Found 1 .xcstrings file(s)" in result.stdout
 
-    def test_auto_detect_cancel_selection(
-        self, temp_dir_with_multiple_xcstrings, monkeypatch
-    ):
+    def test_auto_detect_cancel_selection(self, temp_dir_with_multiple_xcstrings, monkeypatch):
         """Cancel when prompted for file selection."""
         tmpdir, _ = temp_dir_with_multiple_xcstrings
         monkeypatch.chdir(tmpdir)
@@ -380,9 +371,7 @@ class TestDefaultTargets:
         assert result.exit_code == 0
         assert "Using default targets from config" in result.stdout
 
-    def test_translate_explicit_to_overrides_defaults(
-        self, temp_dir_with_xcstrings, monkeypatch
-    ):
+    def test_translate_explicit_to_overrides_defaults(self, temp_dir_with_xcstrings, monkeypatch):
         """Explicit --to option should override default targets."""
         tmpdir, _ = temp_dir_with_xcstrings
         monkeypatch.chdir(tmpdir)
@@ -396,9 +385,7 @@ class TestDefaultTargets:
         assert "Russian" not in result.stdout
         assert "Japanese" not in result.stdout
 
-    def test_translate_default_targets_count(
-        self, temp_dir_with_xcstrings, monkeypatch
-    ):
+    def test_translate_default_targets_count(self, temp_dir_with_xcstrings, monkeypatch):
         """Translate should show correct count of default languages."""
         tmpdir, _ = temp_dir_with_xcstrings
         monkeypatch.chdir(tmpdir)
@@ -417,35 +404,30 @@ class TestDefaultTargets:
         # Check output contains target language info
         assert "Targets:" in result.stdout
 
-    def test_translate_with_explicit_path_uses_defaults(
-        self, temp_dir_with_xcstrings
-    ):
+    def test_translate_with_explicit_path_uses_defaults(self, temp_dir_with_xcstrings):
         """Translate with explicit path should use default targets when --to omitted."""
         tmpdir, files = temp_dir_with_xcstrings
         result = runner.invoke(app, ["translate", str(files[0]), "--dry-run"])
         assert result.exit_code == 0
         assert "Using default targets from config" in result.stdout
 
-    def test_translate_with_custom_config_default_targets(
-        self, temp_dir_with_xcstrings
-    ):
+    def test_translate_with_custom_config_default_targets(self, temp_dir_with_xcstrings):
         """Translate should use custom default_targets from config file."""
         tmpdir, files = temp_dir_with_xcstrings
 
         # Create custom config with only 2 languages
-        config_content = '''
+        config_content = """
 source_language = "en"
 default_targets = ["fr", "de"]
 
 [translator]
 model = "gemini-2.5-flash-lite"
-'''
+"""
         config_path = tmpdir / "config.toml"
         config_path.write_text(config_content)
 
         result = runner.invoke(
-            app,
-            ["translate", str(files[0]), "--config", str(config_path), "--dry-run"]
+            app, ["translate", str(files[0]), "--config", str(config_path), "--dry-run"]
         )
         assert result.exit_code == 0
         assert "Using default targets from config (2 languages)" in result.stdout
@@ -454,29 +436,24 @@ model = "gemini-2.5-flash-lite"
         # Should not have other languages
         assert "Russian" not in result.stdout
 
-    def test_translate_with_empty_config_default_targets(
-        self, temp_dir_with_xcstrings
-    ):
+    def test_translate_with_empty_config_default_targets(self, temp_dir_with_xcstrings):
         """Translate should show error when config has empty default_targets."""
         tmpdir, files = temp_dir_with_xcstrings
 
         # Create config with empty default_targets
-        config_content = '''
+        config_content = """
 source_language = "en"
 default_targets = []
 
 [translator]
 model = "gemini-2.5-flash-lite"
-'''
+"""
         config_path = tmpdir / "config.toml"
         config_path.write_text(config_content)
 
-        result = runner.invoke(
-            app,
-            ["translate", str(files[0]), "--config", str(config_path)]
-        )
+        result = runner.invoke(app, ["translate", str(files[0]), "--config", str(config_path)])
         assert result.exit_code == 1
-        assert "No target languages specified" in result.stdout
+        assert "No target languages or languages to remove specified" in result.stdout
 
     def test_main_callback_without_to_shows_help(self):
         """Main callback without --to should show help (not use defaults)."""

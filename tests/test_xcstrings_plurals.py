@@ -22,7 +22,7 @@ def plurals_file():
 @pytest.fixture
 def temp_xcstrings():
     """Create a temporary xcstrings file for write tests."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.xcstrings', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".xcstrings", delete=False) as f:
         data = {
             "sourceLanguage": "en",
             "version": "1.0",
@@ -34,23 +34,17 @@ def temp_xcstrings():
                             "variations": {
                                 "plural": {
                                     "one": {
-                                        "stringUnit": {
-                                            "state": "translated",
-                                            "value": "%lld week"
-                                        }
+                                        "stringUnit": {"state": "translated", "value": "%lld week"}
                                     },
                                     "other": {
-                                        "stringUnit": {
-                                            "state": "translated",
-                                            "value": "%lld weeks"
-                                        }
-                                    }
+                                        "stringUnit": {"state": "translated", "value": "%lld weeks"}
+                                    },
                                 }
                             }
                         }
-                    }
+                    },
                 }
-            }
+            },
         }
         json.dump(data, f)
         path = Path(f.name)
@@ -91,7 +85,7 @@ class TestPluralParsing:
         assert simple_entry.has_plurals is False
 
     def test_needs_translation_with_plurals(self, plurals_file):
-        """Test that entries with only plurals (no simple text) are marked as needing translation."""
+        """Test entries with only plurals are marked as needing translation."""
         catalog = read_xcstrings(plurals_file)
         weeks_entry = catalog.strings["weeks_ago"]
 
@@ -124,17 +118,14 @@ class TestPluralTranslation:
         """Test _translate_plural_forms method."""
         translator = GeminiTranslator(api_key="fake-key")
 
-        plural_forms = {
-            "one": "%lld week",
-            "other": "%lld weeks"
-        }
+        plural_forms = {"one": "%lld week", "other": "%lld weeks"}
 
         # Mock API calls
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
             # First call for "one" form, second for "other"
             mock_api.side_effect = [
                 "__PH_1__ неделя",  # Russian singular
-                "__PH_1__ недель"   # Russian plural (genitive)
+                "__PH_1__ недель",  # Russian plural (genitive)
             ]
 
             results = await translator._translate_plural_forms(plural_forms, "en", "ru")
@@ -154,18 +145,15 @@ class TestPluralTranslation:
             TranslationRequest(
                 key="weeks_ago",
                 text="%lld weeks",  # This is just for context, actual forms are in plural_forms
-                plural_forms={
-                    "one": "%lld week",
-                    "other": "%lld weeks"
-                }
+                plural_forms={"one": "%lld week", "other": "%lld weeks"},
             )
         ]
 
         # Mock API calls
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
             mock_api.side_effect = [
-                "__PH_1__ semana",   # Spanish singular
-                "__PH_1__ semanas"   # Spanish plural
+                "__PH_1__ semana",  # Spanish singular
+                "__PH_1__ semanas",  # Spanish plural
             ]
 
             results = await translator.translate_batch(requests, "en", "es")
@@ -183,19 +171,10 @@ class TestPluralTranslation:
         translator = GeminiTranslator(api_key="fake-key")
 
         requests = [
+            TranslationRequest(key="simple", text="Hello", plural_forms=None),
             TranslationRequest(
-                key="simple",
-                text="Hello",
-                plural_forms=None
+                key="plural", text="%d items", plural_forms={"one": "%d item", "other": "%d items"}
             ),
-            TranslationRequest(
-                key="plural",
-                text="%d items",
-                plural_forms={
-                    "one": "%d item",
-                    "other": "%d items"
-                }
-            )
         ]
 
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
@@ -205,7 +184,7 @@ class TestPluralTranslation:
             mock_api.side_effect = [
                 "__PH_1__ elemento",  # Plural one
                 "__PH_1__ elementos",  # Plural other
-                "Hola"  # Simple string
+                "Hola",  # Simple string
             ]
 
             results = await translator.translate_batch(requests, "en", "es")
@@ -236,26 +215,11 @@ class TestPluralWriting:
             value="%lld недель",  # Default/fallback value
             variations={
                 "plural": {
-                    "one": {
-                        "stringUnit": {
-                            "state": "translated",
-                            "value": "%lld неделя"
-                        }
-                    },
-                    "few": {
-                        "stringUnit": {
-                            "state": "translated",
-                            "value": "%lld недели"
-                        }
-                    },
-                    "other": {
-                        "stringUnit": {
-                            "state": "translated",
-                            "value": "%lld недель"
-                        }
-                    }
+                    "one": {"stringUnit": {"state": "translated", "value": "%lld неделя"}},
+                    "few": {"stringUnit": {"state": "translated", "value": "%lld недели"}},
+                    "other": {"stringUnit": {"state": "translated", "value": "%lld недель"}},
                 }
-            }
+            },
         )
 
         # Write to file
@@ -296,13 +260,8 @@ class TestPluralEdgeCases:
     def test_plural_with_placeholders(self):
         """Test that placeholders in plural forms are preserved."""
         # This is tested implicitly in other tests, but let's be explicit
-        translator = GeminiTranslator(api_key="fake-key")
 
         # Plural forms with various placeholder types
-        forms = {
-            "one": "%lld day ago",
-            "other": "%lld days ago"
-        }
 
         # The mask_placeholders and unmask_placeholders should handle this
         # in _translate_plural_forms
@@ -336,7 +295,7 @@ class TestPluralEdgeCases:
                     "many": {"stringUnit": {"value": "many items"}},
                     "other": {"stringUnit": {"value": "other items"}},
                 }
-            }
+            },
         )
 
         assert entry.has_plurals is True

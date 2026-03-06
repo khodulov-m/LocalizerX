@@ -258,7 +258,10 @@ def _run_android_translate(
 
         if actually_removed:
             status = "Would remove" if dry_run else "Removed"
-            console.print(f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] {', '.join(actually_removed)}")
+            console.print(
+                f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] "
+                f"{', '.join(actually_removed)}"
+            )
 
         if not target_locales:
             if dry_run:
@@ -393,7 +396,9 @@ async def _translate_android(
     actual_model = model or config.translator.model
 
     thinking_level = getattr(config.translator, "thinking_level", "0")
-    thinking_config = {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    thinking_config = (
+        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    )
 
     async with GeminiTranslator(
         thinking_config=thinking_config,

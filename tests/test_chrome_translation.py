@@ -22,6 +22,7 @@ from localizerx.translator.gemini_adapter import GeminiTranslator
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_translator() -> GeminiTranslator:
     """Create a translator instance without cache (API key is fake)."""
     return GeminiTranslator(api_key="fake-key")
@@ -30,6 +31,7 @@ def _make_translator() -> GeminiTranslator:
 # ---------------------------------------------------------------------------
 # _parse_batch_response
 # ---------------------------------------------------------------------------
+
 
 class TestParseBatchResponse:
     """Ensure _parse_batch_response correctly handles various response formats."""
@@ -44,10 +46,7 @@ class TestParseBatchResponse:
 
     def test_multiline_item(self):
         """A numbered item that spans multiple lines must be kept together."""
-        response = (
-            "1. Première ligne\nDeuxième ligne\nTroisième ligne\n"
-            "2. Autre traduction"
-        )
+        response = "1. Première ligne\nDeuxième ligne\nTroisième ligne\n" "2. Autre traduction"
         result = self.translator._parse_batch_response(response, 2)
         assert len(result) == 2
         assert result[0] == "Première ligne\nDeuxième ligne\nTroisième ligne"
@@ -67,7 +66,7 @@ class TestParseBatchResponse:
             "\n"
             "## Comment ça marche\n"
             "\n"
-            "1. Étape un\n"    # inner numbered list should NOT split
+            "1. Étape un\n"  # inner numbered list should NOT split
             "2. Étape deux\n"  # inner numbered list should NOT split
             "3. Étape trois"
         )
@@ -83,10 +82,7 @@ class TestParseBatchResponse:
 
     def test_two_items_first_is_multiline(self):
         """First item is multi-line, second is single-line."""
-        response = (
-            "1. Ligne A\nLigne B\nLigne C\n"
-            "2. Traduction simple"
-        )
+        response = "1. Ligne A\nLigne B\nLigne C\n" "2. Traduction simple"
         result = self.translator._parse_batch_response(response, 2)
         assert len(result) == 2
         assert "Ligne A\nLigne B\nLigne C" == result[0]
@@ -127,12 +123,7 @@ class TestParseBatchResponse:
 
     def test_multiline_with_blank_lines(self):
         """Blank lines inside a multi-line item must be preserved."""
-        response = (
-            "1. Paragraphe un\n"
-            "\n"
-            "Paragraphe deux\n"
-            "2. Autre"
-        )
+        response = "1. Paragraphe un\n" "\n" "Paragraphe deux\n" "2. Autre"
         result = self.translator._parse_batch_response(response, 2)
         assert len(result) == 2
         assert "Paragraphe un\n\nParagraphe deux" == result[0]
@@ -142,6 +133,7 @@ class TestParseBatchResponse:
 # ---------------------------------------------------------------------------
 # CWS field classification for storeDesc / shortDesc
 # ---------------------------------------------------------------------------
+
 
 class TestCWSFieldClassification:
     """Verify storeDesc and shortDesc are recognized as CWS fields."""
@@ -207,6 +199,7 @@ class TestCWSFieldClassification:
 # End-to-end Chrome translation with mocked API
 # ---------------------------------------------------------------------------
 
+
 class TestChromeTranslationE2E:
     """Test that storeDesc gets translated individually (not batched)."""
 
@@ -222,9 +215,7 @@ class TestChromeTranslationE2E:
 
             en_messages = {
                 "appName": {"message": "Hashtag Generator"},
-                "shortDesc": {
-                    "message": "Create perfect hashtags for social media."
-                },
+                "shortDesc": {"message": "Create perfect hashtags for social media."},
                 "storeDesc": {
                     "message": (
                         "# Hashtag Generator\n\n"
@@ -300,12 +291,7 @@ class TestChromeTranslationE2E:
         translator = _make_translator()
 
         # Content with inner numbered list
-        content_with_numbers = (
-            "# Title\n\n"
-            "1. Step one\n"
-            "2. Step two\n"
-            "3. Step three"
-        )
+        content_with_numbers = "# Title\n\n" "1. Step one\n" "2. Step two\n" "3. Step three"
 
         batch_response = f"1. {content_with_numbers}\n99. Other item"
         # Parser will split on inner "1.", "2.", "3.", "99." — more items than expected

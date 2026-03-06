@@ -13,9 +13,7 @@ class TestTranslation:
     def test_to_xcstrings_dict(self):
         t = Translation(value="Hello", state="translated")
         result = t.to_xcstrings_dict()
-        assert result == {
-            "stringUnit": {"state": "translated", "value": "Hello"}
-        }
+        assert result == {"stringUnit": {"state": "translated", "value": "Hello"}}
 
 
 class TestEntry:
@@ -86,9 +84,7 @@ class TestStringCatalog:
         entries = {
             "hello": Entry(key="hello", source_text="Hello"),
             "empty": Entry(key="empty", source_text=""),
-            "disabled": Entry(
-                key="disabled", source_text="Skip me", should_translate=False
-            ),
+            "disabled": Entry(key="disabled", source_text="Skip me", should_translate=False),
         }
         catalog = StringCatalog(source_language="en", strings=entries)
 

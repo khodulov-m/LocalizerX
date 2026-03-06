@@ -10,7 +10,7 @@ from localizerx.parser.app_context import AppContext
 
 def extract_app_context_string(source_locale: str = "en-US") -> str | None:
     """Extract app context from fastlane metadata or Xcode project files.
-    
+
     Used to enrich translation prompts with app context (name, subtitle, description)
     to provide better context for the AI model.
     """

@@ -28,10 +28,34 @@ class TestDefaultTargetLanguages:
     def test_default_targets_contains_expected_languages(self):
         """Default targets should contain expected languages."""
         expected = [
-            "ru", "fr-FR", "pt-BR", "es-MX", "it", "ja", "pl", "no",
-            "de-DE", "nl-NL", "ko", "da", "sk", "sv", "ro", "uk",
-            "hi", "he", "hr", "zh-Hans", "zh-Hant", "fi", "th", "vi",
-            "en-GB", "ms", "id", "tr",
+            "ru",
+            "fr-FR",
+            "pt-BR",
+            "es-MX",
+            "it",
+            "ja",
+            "pl",
+            "no",
+            "de-DE",
+            "nl-NL",
+            "ko",
+            "da",
+            "sk",
+            "sv",
+            "ro",
+            "uk",
+            "hi",
+            "he",
+            "hr",
+            "zh-Hans",
+            "zh-Hant",
+            "fi",
+            "th",
+            "vi",
+            "en-GB",
+            "ms",
+            "id",
+            "tr",
         ]
         assert DEFAULT_TARGET_LANGUAGES == expected
 
@@ -197,7 +221,7 @@ class TestLoadConfig:
         """Load config with empty default_targets."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write('source_language = "en"\n')
-            f.write('default_targets = []\n')
+            f.write("default_targets = []\n")
             config_path = Path(f.name)
 
         try:
@@ -209,9 +233,9 @@ class TestLoadConfig:
     def test_load_config_with_translator_section(self):
         """Load config with translator section."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
-            f.write('[translator]\n')
+            f.write("[translator]\n")
             f.write('model = "gemini-2.5-pro"\n')
-            f.write('batch_size = 50\n')
+            f.write("batch_size = 50\n")
             config_path = Path(f.name)
 
         try:
@@ -224,7 +248,7 @@ class TestLoadConfig:
     def test_load_config_with_custom_instructions(self):
         """Load config with custom translation instructions."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
-            f.write('[translator]\n')
+            f.write("[translator]\n")
             f.write('custom_instructions = "Do not translate proper names"\n')
             config_path = Path(f.name)
 
@@ -239,15 +263,15 @@ class TestLoadConfig:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write('source_language = "ja"\n')
             f.write('default_targets = ["en", "ko", "zh-Hans"]\n')
-            f.write('concurrency = 10\n')
-            f.write('backup_enabled = false\n')
-            f.write('cache_enabled = false\n')
-            f.write('\n')
-            f.write('[translator]\n')
+            f.write("concurrency = 10\n")
+            f.write("backup_enabled = false\n")
+            f.write("cache_enabled = false\n")
+            f.write("\n")
+            f.write("[translator]\n")
             f.write('provider = "gemini"\n')
             f.write('model = "gemini-2.5-flash"\n')
-            f.write('batch_size = 25\n')
-            f.write('max_retries = 5\n')
+            f.write("batch_size = 25\n")
+            f.write("max_retries = 5\n")
             config_path = Path(f.name)
 
         try:

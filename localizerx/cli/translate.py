@@ -132,7 +132,10 @@ def translate(
         bool,
         typer.Option(
             "--no-app-context",
-            help="Disable automatic app context extraction (name, subtitle, description) from metadata or project files.",
+            help=(
+                "Disable automatic app context extraction (name, subtitle, description) "
+                "from metadata or project files."
+            ),
         ),
     ] = False,
     refresh: Annotated[
@@ -516,7 +519,9 @@ async def _translate_file(
             console.print("[dim]Using extracted app context for translations[/dim]")
 
     thinking_level = getattr(config.translator, "thinking_level", "0")
-    thinking_config = {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    thinking_config = (
+        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    )
 
     async with GeminiTranslator(
         thinking_config=thinking_config,

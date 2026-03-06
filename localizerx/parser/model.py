@@ -56,7 +56,9 @@ class Entry(BaseModel):
     @property
     def needs_translation(self) -> bool:
         """Check if this entry should be translated."""
-        return self.should_translate and (bool(self.source_text.strip()) or self.source_variations is not None)
+        return self.should_translate and (
+            bool(self.source_text.strip()) or self.source_variations is not None
+        )
 
     @property
     def has_plurals(self) -> bool:

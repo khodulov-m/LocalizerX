@@ -156,9 +156,7 @@ def i18n_info(
         raise typer.Exit(1)
 
     index_ts = path / "index.ts"
-    index_status = (
-        "[green]Present[/green]" if index_ts.exists() else "[yellow]Missing[/yellow]"
-    )
+    index_status = "[green]Present[/green]" if index_ts.exists() else "[yellow]Missing[/yellow]"
 
     console.print(f"[bold]Locales Directory:[/bold] {path}")
     console.print(f"[bold]Source Locale:[/bold] {catalog.source_locale}")
@@ -247,7 +245,10 @@ def _run_i18n_translate(
 
         if actually_removed:
             status = "Would remove" if dry_run else "Removed"
-            console.print(f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] {', '.join(actually_removed)}")
+            console.print(
+                f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] "
+                f"{', '.join(actually_removed)}"
+            )
 
         if not target_locales:
             if dry_run:
@@ -360,7 +361,9 @@ async def _translate_i18n(
     actual_model = model or config.translator.model
 
     thinking_level = getattr(config.translator, "thinking_level", "0")
-    thinking_config = {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    thinking_config = (
+        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    )
 
     async with GeminiTranslator(
         thinking_config=thinking_config,

@@ -25,6 +25,7 @@ def _make_translator() -> GeminiTranslator:
 # Bug #1: Context metadata leaking into translations
 # ---------------------------------------------------------------------------
 
+
 class TestContextMetadataStripping:
     """Verify that context metadata is stripped from translations."""
 
@@ -102,6 +103,7 @@ class TestContextMetadataStripping:
 # Bug #2: Multiline strings with \n\n causing shift
 # ---------------------------------------------------------------------------
 
+
 class TestMultilineStringParsing:
     """Test parsing of responses with multiline content containing \\n\\n."""
 
@@ -149,6 +151,7 @@ class TestMultilineStringParsing:
 # ---------------------------------------------------------------------------
 # Bug reproduction: xcstrings example scenarios
 # ---------------------------------------------------------------------------
+
 
 class TestXcstringsExampleBugs:
     """Reproduce the exact bugs from examples/Localizable.xcstrings."""
@@ -242,6 +245,7 @@ class TestXcstringsExampleBugs:
 # New marker format: <<ITEM_N>>
 # ---------------------------------------------------------------------------
 
+
 class TestNewMarkerFormat:
     """Test parsing of new <<ITEM_N>> marker format."""
 
@@ -251,8 +255,7 @@ class TestNewMarkerFormat:
     def test_parse_new_markers(self):
         """Parse response using <<ITEM_N>> format."""
         response = (
-            "<<ITEM_1>>\nBonjour le monde\n<</ITEM_1>>\n\n"
-            "<<ITEM_2>>\nAu revoir\n<</ITEM_2>>"
+            "<<ITEM_1>>\nBonjour le monde\n<</ITEM_1>>\n\n" "<<ITEM_2>>\nAu revoir\n<</ITEM_2>>"
         )
         result = self.translator._parse_batch_response(response, 2)
 
@@ -271,11 +274,7 @@ class TestNewMarkerFormat:
 
     def test_parse_markers_with_context_stripped(self):
         """Context metadata is stripped even with new marker format."""
-        response = (
-            "<<ITEM_1>>\n"
-            "Настройки [Контекст: Заголовок экрана настроек.]\n"
-            "<</ITEM_1>>"
-        )
+        response = "<<ITEM_1>>\n" "Настройки [Контекст: Заголовок экрана настроек.]\n" "<</ITEM_1>>"
         result = self.translator._parse_batch_response(response, 1)
 
         assert len(result) == 1
@@ -296,6 +295,7 @@ class TestNewMarkerFormat:
 # Full translate_batch flow
 # ---------------------------------------------------------------------------
 
+
 class TestTranslateBatchWithContext:
     """Test translate_batch correctly handles context without pollution."""
 
@@ -306,21 +306,16 @@ class TestTranslateBatchWithContext:
 
         requests = [
             TranslationRequest(
-                key="settings_title",
-                text="Settings",
-                comment="The title of the settings screen."
+                key="settings_title", text="Settings", comment="The title of the settings screen."
             ),
             TranslationRequest(
-                key="save_button",
-                text="Save",
-                comment="A button label that saves changes."
+                key="save_button", text="Save", comment="A button label that saves changes."
             ),
         ]
 
         # Mock response with new marker format (clean, no context)
         mock_response = (
-            "<<ITEM_1>>\nEinstellungen\n<</ITEM_1>>\n\n"
-            "<<ITEM_2>>\nSpeichern\n<</ITEM_2>>"
+            "<<ITEM_1>>\nEinstellungen\n<</ITEM_1>>\n\n" "<<ITEM_2>>\nSpeichern\n<</ITEM_2>>"
         )
 
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
@@ -346,7 +341,7 @@ class TestTranslateBatchWithContext:
             TranslationRequest(
                 key="delete_warning",
                 text=original,
-                comment="An alert message for account deletion."
+                comment="An alert message for account deletion.",
             ),
         ]
 
@@ -376,12 +371,12 @@ class TestTranslateBatchWithContext:
             TranslationRequest(
                 key="delete_msg",
                 text="This action cannot be undone.\n\nType DELETE to confirm.",
-                comment="Delete confirmation."
+                comment="Delete confirmation.",
             ),
             TranslationRequest(
                 key="password_toggle",
                 text="Toggles password visibility",
-                comment="Accessibility hint."
+                comment="Accessibility hint.",
             ),
         ]
 
@@ -418,6 +413,7 @@ class TestTranslateBatchWithContext:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     """Edge cases and corner scenarios."""

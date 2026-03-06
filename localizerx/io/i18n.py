@@ -152,19 +152,13 @@ def update_index_ts(path: Path, catalog: I18nCatalog) -> None:
 
         if layout == "dir":
             filename = _find_json_filename(path, catalog.source_locale)
-            imports.append(f"import {var_name} from \"./{locale_code}/{filename}\";")
+            imports.append(f'import {var_name} from "./{locale_code}/{filename}";')
         else:
-            imports.append(f"import {var_name} from \"./{locale_code}.json\";")
+            imports.append(f'import {var_name} from "./{locale_code}.json";')
 
-        exports.append(f"  \"{locale_code}\": {var_name},")
+        exports.append(f'  "{locale_code}": {var_name},')
 
-    lines = (
-        imports
-        + [""]
-        + ["export default {"]
-        + exports
-        + ["} as const;", ""]
-    )
+    lines = imports + [""] + ["export default {"] + exports + ["} as const;", ""]
 
     with open(index_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

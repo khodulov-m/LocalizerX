@@ -52,7 +52,7 @@ SCREEN DESCRIPTION: {user_hint}
     if previous_texts:
         # Keep only the most recent ones to avoid context explosion, but enough to prevent repetition
         recent_texts = previous_texts[-15:]
-        prompt += f"""
+        prompt += """
 AVOID REPETITION:
 Do not generate the exact same text or use very similar phrasing to these previously generated texts:
 """
@@ -137,9 +137,7 @@ def build_batch_generation_prompt(
     for i, (screen_id, text_type, device_class, hint) in enumerate(items, 1):
         device_note = "SHORT" if device_class == DeviceClass.SMALL else "NORMAL"
         hint_text = f" - {hint}" if hint else ""
-        items_block.append(
-            f"{i}. [{screen_id}] [{text_type.value}] [{device_note}]{hint_text}"
-        )
+        items_block.append(f"{i}. [{screen_id}] [{text_type.value}] [{device_note}]{hint_text}")
 
     items_str = "\n".join(items_block)
     count = len(items)
@@ -157,7 +155,7 @@ TASK: Generate {count} screenshot texts for the following:
     if previous_texts:
         # Keep only the most recent ones to avoid context explosion
         recent_texts = previous_texts[-20:]
-        prompt += f"""
+        prompt += """
 AVOID REPETITION:
 Do not generate the exact same text or use very similar phrasing to these previously generated texts:
 """

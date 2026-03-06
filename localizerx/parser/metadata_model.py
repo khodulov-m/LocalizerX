@@ -184,8 +184,7 @@ class MetadataCatalog(BaseModel):
             "source_locale": self.source_locale,
             "locales": {
                 locale: {
-                    field_type.value: field.content
-                    for field_type, field in meta.fields.items()
+                    field_type.value: field.content for field_type, field in meta.fields.items()
                 }
                 for locale, meta in self.locales.items()
             },

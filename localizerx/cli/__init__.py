@@ -11,8 +11,6 @@ from rich.table import Table
 from localizerx import __version__
 from localizerx.cli.utils import console
 from localizerx.config import (
-    DEFAULT_MODEL,
-    GEMINI_MODELS,
     create_default_config,
     get_cache_dir,
     load_config,
@@ -147,7 +145,10 @@ def main(
         bool,
         typer.Option(
             "--no-app-context",
-            help="Disable automatic app context extraction (name, subtitle, description) from metadata or project files.",
+            help=(
+                "Disable automatic app context extraction (name, subtitle, description) "
+                "from metadata or project files."
+            ),
         ),
     ] = False,
     remove: Annotated[
@@ -218,7 +219,11 @@ def list_models() -> None:
         response = httpx.get(url, timeout=10.0)
         response.raise_for_status()
         data = response.json()
-        models = [m["name"].replace("models/", "") for m in data.get("models", []) if "generateContent" in m.get("supportedGenerationMethods", [])]
+        models = [
+            m["name"].replace("models/", "")
+            for m in data.get("models", [])
+            if "generateContent" in m.get("supportedGenerationMethods", [])
+        ]
 
         table = Table(title="Available Gemini Models")
         table.add_column("Model", style="cyan")
@@ -259,7 +264,7 @@ def use_model(
     section_pattern = re.compile(r"^\[translator\]$", re.MULTILINE)
     match = section_pattern.search(content)
     if not match:
-        content += f"\n[translator]\nmodel = \"{model}\"\nthinking_level = \"{thinking_level}\"\n"
+        content += f'\n[translator]\nmodel = "{model}"\nthinking_level = "{thinking_level}"\n'
     else:
         # Extract the translator section
         start = match.end()
@@ -277,14 +282,19 @@ def use_model(
         # Update thinking_level
         thinking_pattern = re.compile(r"^thinking_level\s*=\s*.*$", re.MULTILINE)
         if thinking_pattern.search(section_content):
-            section_content = thinking_pattern.sub(f'thinking_level = "{thinking_level}"', section_content)
+            section_content = thinking_pattern.sub(
+                f'thinking_level = "{thinking_level}"', section_content
+            )
         else:
             section_content += f'thinking_level = "{thinking_level}"\n'
 
         content = content[:start] + section_content + content[end:]
 
     config_path.write_text(content)
-    console.print(f"[green]Successfully set model to [cyan]{model}[/cyan] with thinking_level [cyan]{thinking_level}[/cyan].[/green]")
+    console.print(
+        f"[green]Successfully set model to [cyan]{model}[/cyan] with "
+        f"thinking_level [cyan]{thinking_level}[/cyan].[/green]"
+    )
 
 
 @app.command()
