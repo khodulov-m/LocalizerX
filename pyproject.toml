@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localizerx"
-version = "0.1.0"
+version = "0.1.1"
 description = "CLI tool for translating Xcode String Catalogs using Gemini API"
 readme = "README.md"
 license = {text = "MIT"}
@@ -46,8 +46,8 @@ localizerx = "localizerx.cli:app"
 lrx = "localizerx.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/localizerx/localizerx"
-Repository = "https://github.com/localizerx/localizerx"
+Homepage = "https://github.com/khodulov-m/LocalizerX"
+Repository = "https://github.com/khodulov-m/LocalizerX"
 
 [tool.setuptools.packages.find]
 where = ["."]
