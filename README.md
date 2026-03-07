@@ -1,6 +1,6 @@
 # 🌎 LocalizerX
 
-> **Quick Tip:** You can use `lox` as a handy shorthand for the `localizerx` command anywhere!
+> **Quick Tip:** You can use `lrx` as a handy shorthand for the `localizerx` command anywhere!
 
 Welcome to **LocalizerX**! The CLI tool designed to make your localization workflow seamless and fast. LocalizerX uses the power of the Gemini API to automatically translate your project assets across multiple platforms and formats.
 
@@ -30,7 +30,7 @@ LocalizerX is built for developers who want to reach a global audience without t
 - **Gemini API key**
 
 ### 1. Using pipx (Recommended for Global Usage)
-`pipx` installs LocalizerX in an isolated environment and makes the `localizerx` and `lox` commands available globally.
+`pipx` installs LocalizerX in an isolated environment and makes the `localizerx` and `lrx` commands available globally.
 
 ```bash
 # If you don't have pipx yet:
@@ -81,7 +81,7 @@ echo 'export GEMINI_API_KEY="your-api-key"' >> ~/.zshrc
 Create a configuration file to set your default languages and preferences:
 
 ```bash
-lox init
+lrx init
 ```
 
 This creates a config file at `~/.config/localizerx/config.toml`. Here's a peek at what you can customize:
@@ -105,13 +105,13 @@ cache_enabled = true
 Want to translate everything to your default languages? Just run:
 
 ```bash
-lox translate
+lrx translate
 ```
 
 Or target specific languages:
 
 ```bash
-lox --to fr,es,de
+lrx --to fr,es,de
 ```
 
 ### 📱 Supporting All Your Platforms
@@ -121,44 +121,44 @@ LocalizerX is a polyglot! Here’s how to use it for different formats:
 #### **Xcode String Catalogs (.xcstrings)**
 ```bash
 # Translate a specific file or an entire directory
-lox translate Localizable.xcstrings --to fr,es,de
-lox translate ./MyApp --to ja,ko
+lrx translate Localizable.xcstrings --to fr,es,de
+lrx translate ./MyApp --to ja,ko
 ```
 
 #### **App Store Metadata (fastlane)**
 ```bash
 # Translate App Store name, subtitle, and description
-lox metadata --to de-DE,fr-FR
+lrx metadata --to de-DE,fr-FR
 
 # Check character limits and find duplicate words for ASO
-lox metadata-check
+lrx metadata-check
 ```
 
 #### **App Store Screenshot Texts**
 ```bash
 # Generate marketing-optimized texts interactively
-lox screenshots-generate
+lrx screenshots-generate
 
 # Translate them to reach a global audience
-lox screenshots --to de,fr,es
+lrx screenshots --to de,fr,es
 ```
 
 #### **Chrome Extensions**
 ```bash
 # Translate _locales/messages.json files
-lox chrome --to fr,de,pt-BR
+lrx chrome --to fr,de,pt-BR
 ```
 
 #### **Frontend i18n (JSON)**
 ```bash
 # Works with Vue, React, Angular, and more
-lox i18n --to es,ja,zh-Hans
+lrx i18n --to es,ja,zh-Hans
 ```
 
 #### **Android Resources**
 ```bash
 # Translate strings.xml (including arrays and plurals!)
-lox android --to fr,de --include-plurals
+lrx android --to fr,de --include-plurals
 ```
 
 ### 🧹 Cleaning up Languages
@@ -167,12 +167,12 @@ Need to remove some languages from your project? LocalizerX makes it easy:
 
 ```bash
 # Remove French, German, and Italian translations from .xcstrings
-lox translate --remove fr,de,it
+lrx translate --remove fr,de,it
 
 # Remove specific locales for Android, Chrome, or Frontend i18n
-lox android --remove fr,es
-lox chrome --remove pt-BR
-lox i18n --remove de
+lrx android --remove fr,es
+lrx chrome --remove pt-BR
+lrx i18n --remove de
 ```
 
 ---
