@@ -46,3 +46,9 @@ htmlcov/
 
 # Project specific
 *.xcstrings.backup
+.env
+.env.*
+*.pem
+*.key
+config.toml
+translations.db
