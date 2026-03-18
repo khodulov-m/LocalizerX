@@ -32,15 +32,22 @@ localizerx translate Localizable.xcstrings --to fr,es,de --src en
 
 ### Translate App Store Metadata
 
-Translates App Store metadata text files (`name.txt`, `subtitle.txt`, etc.). Untranslatable URLs (`marketing_url.txt`, `privacy_url.txt`, `support_url.txt`, `apple_tv_privacy_policy.txt`) are automatically copied.
+Translates App Store metadata text files (`name.txt`, `subtitle.txt`, etc.). Automatically finds and processes both iOS (`fastlane/metadata`) and macOS (`fastlane/metadata_macos`) directories if they exist.
 
 ```bash
 localizerx metadata <path> --to <target_languages> --src <source_language>
 ```
 
+**Options:**
+- `<path>`: Optional. Path to fastlane metadata directory. If omitted, it automatically scans for `./fastlane/metadata` and `./fastlane/metadata_macos`.
+
 **Example:**
 ```bash
-localizerx metadata ./fastlane/metadata --to fr-FR,de-DE
+# Automatic detection
+localizerx metadata --to fr-FR,de-DE
+
+# Manual path
+localizerx metadata ./fastlane/metadata_macos --to fr-FR,de-DE
 ```
 
 You can also set URLs across all locales using the `metadata-urls` command:

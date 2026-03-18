@@ -167,11 +167,18 @@ class TestMetadataInfoCommand:
         assert "name" in result.stdout
         assert "subtitle" in result.stdout
 
-    def test_metadata_info_invalid_path(self):
-        """Test metadata-info with non-existent path."""
-        result = runner.invoke(app, ["metadata-info", "/nonexistent/path"])
-        assert result.exit_code == 1
-        assert "does not exist" in result.stdout
+    def test_metadata_info_manual_path(self, sample_metadata_dir):
+        """Test metadata-info command with a manually specified path."""
+        result = runner.invoke(app, ["metadata-info", str(sample_metadata_dir)])
+        assert result.exit_code == 0
+        assert f"Metadata Directory: {sample_metadata_dir}" in result.stdout
+        assert "Source Locale: en-US" in result.stdout
+
+    def test_metadata_check_manual_path(self, sample_metadata_dir):
+        """Test metadata-check command with a manually specified path."""
+        result = runner.invoke(app, ["metadata-check", str(sample_metadata_dir), "--skip-duplicates"])
+        assert result.exit_code == 0
+        assert "All fields are within character limits" in result.stdout
 
 
 class TestMetadataAutoDetection:
@@ -192,6 +199,29 @@ class TestMetadataAutoDetection:
             result = runner.invoke(app, ["metadata", "--to", "de-DE"])
             assert result.exit_code == 1
             assert "No metadata directory found" in result.stdout
+
+    def test_auto_detect_multiple_metadata(self, monkeypatch):
+        """Test auto-detection of multiple metadata directories (iOS and macOS)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            monkeypatch.chdir(tmpdir)
+
+            # Create iOS metadata
+            ios_dir = tmpdir / "fastlane" / "metadata"
+            ios_dir.mkdir(parents=True)
+            (ios_dir / "en-US").mkdir()
+            (ios_dir / "en-US" / "name.txt").write_text("iOS App")
+
+            # Create macOS metadata
+            macos_dir = tmpdir / "fastlane" / "metadata_macos"
+            macos_dir.mkdir(parents=True)
+            (macos_dir / "en-US").mkdir()
+            (macos_dir / "en-US" / "name.txt").write_text("macOS App")
+
+            result = runner.invoke(app, ["metadata", "--to", "de-DE", "--dry-run"])
+            assert result.exit_code == 0
+            assert "Processing metadata in fastlane/metadata" in result.stdout
+            assert "Processing metadata in fastlane/metadata_macos" in result.stdout
 
 
 class TestMetadataLocaleValidation:

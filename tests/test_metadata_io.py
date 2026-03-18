@@ -181,6 +181,41 @@ class TestDetectMetadataPath:
             result = detect_metadata_path(tmpdir)
             assert result == metadata_dir
 
+    def test_detect_macos_in_fastlane(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            metadata_dir = tmpdir / "fastlane" / "metadata_macos"
+            metadata_dir.mkdir(parents=True)
+
+            # Create minimal structure
+            en_dir = metadata_dir / "en-US"
+            en_dir.mkdir()
+            (en_dir / "name.txt").write_text("Test")
+
+            result = detect_metadata_path(tmpdir)
+            assert result == metadata_dir
+
+    def test_detect_all_paths(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            # Create both iOS and macOS metadata
+            ios_dir = tmpdir / "fastlane" / "metadata"
+            ios_dir.mkdir(parents=True)
+            (ios_dir / "en-US").mkdir()
+            (ios_dir / "en-US" / "name.txt").write_text("iOS App")
+
+            macos_dir = tmpdir / "fastlane" / "metadata_macos"
+            macos_dir.mkdir(parents=True)
+            (macos_dir / "en-US").mkdir()
+            (macos_dir / "en-US" / "name.txt").write_text("macOS App")
+
+            from localizerx.io.metadata import detect_all_metadata_paths
+
+            results = detect_all_metadata_paths(tmpdir)
+            assert len(results) == 2
+            assert ios_dir in results
+            assert macos_dir in results
+
     def test_detect_in_current_dir(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)

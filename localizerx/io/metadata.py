@@ -129,8 +129,10 @@ def detect_metadata_path(start_path: Path | None = None) -> Path | None:
 
     Searches in common locations:
     - ./fastlane/metadata
+    - ./fastlane/metadata_macos
     - ./metadata
     - ../fastlane/metadata
+    - ../fastlane/metadata_macos
 
     Args:
         start_path: Starting directory (default: current working directory)
@@ -138,23 +140,41 @@ def detect_metadata_path(start_path: Path | None = None) -> Path | None:
     Returns:
         Path to metadata directory if found, None otherwise
     """
+    paths = detect_all_metadata_paths(start_path)
+    return paths[0] if paths else None
+
+
+def detect_all_metadata_paths(start_path: Path | None = None) -> list[Path]:
+    """
+    Auto-detect all fastlane metadata directories.
+
+    Args:
+        start_path: Starting directory (default: current working directory)
+
+    Returns:
+        List of paths to metadata directories found
+    """
     if start_path is None:
         start_path = Path.cwd()
 
     # Common metadata directory locations
     candidates = [
         start_path / "fastlane" / "metadata",
+        start_path / "fastlane" / "metadata_macos",
         start_path / "metadata",
         start_path.parent / "fastlane" / "metadata",
+        start_path.parent / "fastlane" / "metadata_macos",
     ]
 
+    found = []
     for candidate in candidates:
         if candidate.exists() and candidate.is_dir():
             # Verify it looks like a metadata directory
             if _looks_like_metadata_dir(candidate):
-                return candidate
+                if candidate not in found:
+                    found.append(candidate)
 
-    return None
+    return found
 
 
 def _looks_like_metadata_dir(path: Path) -> bool:

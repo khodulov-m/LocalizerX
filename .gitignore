@@ -52,3 +52,5 @@ htmlcov/
 *.key
 config.toml
 translations.db
+
+firebase-debug.log

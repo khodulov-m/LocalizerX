@@ -128,6 +128,7 @@ lrx translate ./MyApp --to ja,ko
 #### **App Store Metadata (fastlane)**
 ```bash
 # Translate App Store name, subtitle, and description
+# Automatically finds and processes fastlane/metadata and fastlane/metadata_macos
 lrx metadata --to de-DE,fr-FR
 
 # Check character limits and find duplicate words for ASO
