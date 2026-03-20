@@ -144,6 +144,13 @@ lrx screenshots-generate
 lrx screenshots --to de,fr,es
 ```
 
+#### **Fastlane Frameit**
+```bash
+# Translate Frameit title.strings and keyword.strings
+# Automatically finds and processes fastlane/screenshots/
+lrx frameit --to fr-FR,de-DE
+```
+
 #### **Chrome Extensions**
 ```bash
 # Translate _locales/messages.json files

@@ -6,7 +6,7 @@ LocalizerX (or `lrx` for short) is a Python-based CLI tool designed to automate 
 
 ### Core Capabilities
 - Translates Xcode String Catalogs (`.xcstrings`), Android `strings.xml`, frontend i18n JSON files, and Chrome Extension `_locales` messages.
-- Translates and manages App Store metadata (via fastlane formats) and app screenshot marketing texts.
+- Translates and manages App Store metadata (via fastlane formats), app screenshot marketing texts, and Fastlane Frameit titles/keywords.
 - Handles complex localization nuances like pluralization, declension forms, and developer comments.
 - **Key Design Principles:**
   - **Lossless Parsing:** Ensure the structure of localization files is preserved exactly; only translations are added.
@@ -63,11 +63,11 @@ pytest tests/test_file.py::test_function
 
 ## Architecture Map
 
-- **`localizerx/cli/`**: Typer-based CLI command definitions (`translate.py`, `metadata.py`, `android.py`, etc.).
+- **`localizerx/cli/`**: Typer-based CLI command definitions (`translate.py`, `metadata.py`, `android.py`, `frameit.py`, etc.).
 - **`localizerx/config.py`**: Configuration management using TOML (stored in `~/.config/localizerx/config.toml`).
-- **`localizerx/io/`**: I/O handlers for various formats (e.g., `xcstrings.py`, `android.py`, `extension.py`). Ensures lossless parsing.
-- **`localizerx/parser/`**: Pydantic data models for entries, translations, and specific app contexts (`model.py`, `metadata_model.py`, etc.).
-- **`localizerx/translator/`**: Core translation logic. Contains the `gemini_adapter.py` for API interaction and domain-specific prompt templates (`extension_prompts.py`, `screenshots_prompts.py`).
+- **`localizerx/io/`**: I/O handlers for various formats (e.g., `xcstrings.py`, `android.py`, `extension.py`, `frameit.py`). Ensures lossless parsing.
+- **`localizerx/parser/`**: Pydantic data models for entries, translations, and specific app contexts (`model.py`, `metadata_model.py`, `frameit_model.py`, etc.).
+- **`localizerx/translator/`**: Core translation logic. Contains the `gemini_adapter.py` for API interaction and domain-specific prompt templates (`extension_prompts.py`, `screenshots_prompts.py`, `frameit_prompts.py`).
 - **`localizerx/utils/`**: Utilities for placeholder masking (`placeholders.py`), locale mapping (`locale.py`), and character limit enforcement (`limits.py`).
 - **`tests/`**: Comprehensive test suite organized by module and functionality.
 

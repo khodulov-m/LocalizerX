@@ -28,6 +28,7 @@ from localizerx.cli import (  # noqa: E402
     android,
     chrome,
     delete,
+    frameit,
     i18n,
     metadata,
     screenshots,
@@ -358,3 +359,4 @@ app.command("android-info")(android.android_info)
 app.command("screenshots")(screenshots.screenshots_translate)
 app.command("screenshots-info")(screenshots.screenshots_info)
 app.command("screenshots-generate")(screenshots.screenshots_generate)
+app.command("frameit")(frameit.frameit)
