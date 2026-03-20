@@ -186,6 +186,7 @@ lrx i18n --remove de
 | `--remove` | `-r` | Languages to remove (comma-separated). |
 | `--src` | `-s` | Source language (default: `en`). |
 | `--refresh` | | Add new strings and clean up stale ones automatically. |
+| `--mark-empty` | | Mark empty/whitespace strings as translated. |
 | `--preview` | `-p` | Review translations before they are saved. |
 | `--dry-run` | `-n` | See what would happen without making any changes. |
 | `--backup` | `-b` | Creates a backup of your file before writing. |

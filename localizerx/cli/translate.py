@@ -145,6 +145,13 @@ def translate(
             help="Automatically add translations for new strings and delete stale strings.",
         ),
     ] = False,
+    mark_empty: Annotated[
+        bool,
+        typer.Option(
+            "--mark-empty",
+            help="Mark empty or whitespace strings as translated for all target languages.",
+        ),
+    ] = False,
     remove: Annotated[
         Optional[str],
         typer.Option(
@@ -173,6 +180,7 @@ def translate(
         custom_prompt=custom_prompt,
         no_app_context=no_app_context,
         refresh=refresh,
+        mark_empty=mark_empty,
         remove=remove,
     )
 
@@ -192,6 +200,7 @@ def _run_translate(
     custom_prompt: str | None,
     no_app_context: bool,
     refresh: bool,
+    mark_empty: bool,
     remove: str | None = None,
 ) -> None:
     """Core translation logic."""
@@ -286,6 +295,7 @@ def _run_translate(
             custom_prompt=custom_prompt,
             no_app_context=no_app_context,
             refresh=refresh,
+            mark_empty=mark_empty,
         )
 
 
@@ -366,6 +376,7 @@ def _process_file(
     custom_prompt: str | None,
     no_app_context: bool,
     refresh: bool,
+    mark_empty: bool,
 ) -> None:
     """Process a single xcstrings file."""
     console.print(f"[bold]Processing:[/bold] {file_path}")
@@ -373,6 +384,26 @@ def _process_file(
     # Read file
     catalog = read_xcstrings(file_path)
     console.print(f"  Found {len(catalog.strings)} string(s)")
+
+    # Mark empty strings if requested
+    marked_count = 0
+    if mark_empty:
+        for target_lang in target_langs:
+            for entry in catalog.strings.values():
+                # Check if source text is empty or whitespace and has no variations
+                if not entry.source_text.strip() and not entry.source_variations:
+                    if target_lang not in entry.translations or overwrite:
+                        if not dry_run:
+                            entry.translations[target_lang] = Translation(
+                                value=entry.source_text, state="translated"
+                            )
+                        marked_count += 1
+
+        if marked_count > 0:
+            msg = "Marked" if not dry_run else "Would mark"
+            console.print(
+                f"  [green]{msg} {marked_count} empty/whitespace string(s) as translated[/green]"
+            )
 
     # Remove languages if requested
     languages_actually_removed = []
@@ -428,7 +459,7 @@ def _process_file(
             translation_tasks[target_lang] = entries_to_translate
 
     if not translation_tasks:
-        if (refresh and stale_keys) or languages_actually_removed:
+        if (refresh and stale_keys) or languages_actually_removed or marked_count > 0:
             if dry_run:
                 console.print("  [yellow]Dry run - no changes made[/yellow]")
                 return
