@@ -18,7 +18,7 @@ def build_frameit_prompt(
     tgt_name = get_fastlane_locale_name(tgt_lang) or tgt_lang
 
     prompt = [
-        f"You are an expert app localization translator specializing in App Store screenshot texts.",
+        "You are an expert app localization translator specializing in App Store screenshot texts.",
         f"Translate the following screenshot texts from {src_name} ({src_lang}) to {tgt_name} ({tgt_lang}).",
         "",
         "These are short, punchy marketing texts displayed on app screenshots.",

@@ -388,7 +388,7 @@ def metadata_check(
 ) -> None:
     """Check metadata files for App Store character limit compliance and ASO optimization."""
     from localizerx.io.metadata import detect_all_metadata_paths, read_metadata
-    from localizerx.parser.metadata_model import MetadataFieldType, FIELD_LIMITS
+    from localizerx.parser.metadata_model import FIELD_LIMITS, MetadataFieldType
     from localizerx.utils.limits import validate_limit
 
     # Find metadata paths
@@ -866,8 +866,8 @@ async def _translate_metadata(
     from localizerx.utils.limits import LimitAction, truncate_to_limit, validate_limit
 
     cache_dir = get_cache_dir(config)
-    actual_model = model or config.translator.model
-    actual_temperature = temperature if temperature is not None else config.translator.temperature
+    actual_model = model or config.metadata.model
+    actual_temperature = temperature if temperature is not None else config.metadata.temperature
 
     source = catalog.get_source_metadata()
     if not source:
@@ -875,7 +875,7 @@ async def _translate_metadata(
 
     semaphore = asyncio.Semaphore(5)
 
-    thinking_level = getattr(config.translator, "thinking_level", "0")
+    thinking_level = getattr(config.metadata, "thinking_level", "0")
     thinking_config = (
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
     )
@@ -883,7 +883,7 @@ async def _translate_metadata(
     async with GeminiTranslator(
         thinking_config=thinking_config,
         model=actual_model,
-        max_retries=config.translator.max_retries,
+        max_retries=config.metadata.max_retries,
         cache_dir=cache_dir,
         temperature=actual_temperature,
     ) as translator:
@@ -1051,76 +1051,3 @@ def _show_metadata_preview(source, all_translations: dict) -> None:
         table.add_row("...", "", f"({total - 20} more)", "")
 
     console.print(table)
-
-
-def metadata_urls(
-    path: Annotated[
-        Optional[Path],
-        typer.Argument(
-            help="Path to fastlane metadata directory (auto-detected if omitted)",
-        ),
-    ] = None,
-    marketing: Annotated[
-        Optional[str],
-        typer.Option("--marketing", help="URL for marketing_url.txt"),
-    ] = None,
-    privacy: Annotated[
-        Optional[str],
-        typer.Option("--privacy", help="URL for privacy_url.txt"),
-    ] = None,
-    support: Annotated[
-        Optional[str],
-        typer.Option("--support", help="URL for support_url.txt"),
-    ] = None,
-    apple_tv_privacy: Annotated[
-        Optional[str],
-        typer.Option("--apple-tv-privacy", help="URL for apple_tv_privacy_policy.txt"),
-    ] = None,
-) -> None:
-    """Set URL files for all existing locales in fastlane metadata."""
-    from localizerx.io.metadata import detect_all_metadata_paths, get_available_locales
-
-    # Find metadata paths
-    if path is not None:
-        if not path.exists():
-            console.print(f"[red]Error:[/red] Path does not exist: {path}")
-            raise typer.Exit(1)
-        paths = [path]
-    else:
-        paths = detect_all_metadata_paths()
-        if not paths:
-            console.print("[red]Error:[/red] No metadata directory found")
-            console.print("Run from a directory with fastlane/metadata or specify path")
-            raise typer.Exit(1)
-
-    urls = {}
-    if marketing is not None:
-        urls["marketing_url.txt"] = marketing
-    if privacy is not None:
-        urls["privacy_url.txt"] = privacy
-    if support is not None:
-        urls["support_url.txt"] = support
-    if apple_tv_privacy is not None:
-        urls["apple_tv_privacy_policy.txt"] = apple_tv_privacy
-
-    if not urls:
-        console.print(
-            "[yellow]No URLs specified. Use --marketing, --privacy, "
-            "--support, or --apple-tv-privacy.[/yellow]"
-        )
-        raise typer.Exit(0)
-
-    for p in paths:
-        rel_path = p.relative_to(Path.cwd()) if p.is_relative_to(Path.cwd()) else p
-        locales = get_available_locales(p)
-        if not locales:
-            console.print(f"[yellow]Warning:[/yellow] No locales found in {rel_path}")
-            continue
-
-        for locale in locales:
-            locale_dir = p / locale
-            for filename, url in urls.items():
-                file_path = locale_dir / filename
-                file_path.write_text(url + "\n", encoding="utf-8")
-
-        console.print(f"[green]Successfully updated URLs for {len(locales)} locales in {rel_path}[/green]")

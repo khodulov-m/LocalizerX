@@ -392,10 +392,10 @@ async def _translate_android(
     from localizerx.parser.android_model import AndroidPlural, AndroidString, AndroidStringArray
 
     cache_dir = get_cache_dir(config)
-    actual_batch_size = batch_size or config.translator.batch_size
-    actual_model = model or config.translator.model
+    actual_batch_size = batch_size or config.android.batch_size
+    actual_model = model or config.android.model
 
-    thinking_level = getattr(config.translator, "thinking_level", "0")
+    thinking_level = getattr(config.android, "thinking_level", "0")
     thinking_config = (
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
     )
@@ -404,7 +404,7 @@ async def _translate_android(
         thinking_config=thinking_config,
         model=actual_model,
         batch_size=actual_batch_size,
-        max_retries=config.translator.max_retries,
+        max_retries=config.android.max_retries,
         cache_dir=cache_dir,
     ) as translator:
         all_results: dict[str, dict] = {}  # locale -> {strings: {}, arrays: {}, plurals: {}}

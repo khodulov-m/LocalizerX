@@ -867,7 +867,7 @@ async def _translate_screenshots(
         parse_batch_screenshot_response,
     )
 
-    ss_cfg = config.translator.screenshots
+    ss_cfg = config.screenshots
     cache_dir = get_cache_dir(config)
     actual_model = model or ss_cfg.model
     thinking_config = {"thinkingLevel": ss_cfg.thinking_level}

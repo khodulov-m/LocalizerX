@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
-import pytest
 from typer.testing import CliRunner
 
 from localizerx.cli import app
@@ -45,7 +41,7 @@ def test_frameit_detect_path(tmp_path, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "mock-key")
 
     result = runner.invoke(app, ["frameit", "--to", "fr-FR"])
-    
+
     # Check for Frameit path without being too strict about newlines
     assert "Frameit path:" in result.stdout
     assert "fastlane/screenshots" in result.stdout.replace("\n", "")

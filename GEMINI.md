@@ -21,7 +21,7 @@ LocalizerX (or `lrx` for short) is a Python-based CLI tool designed to automate 
 - **HTTP Client:** HTTPX
 - **Data Validation:** Pydantic
 - **Formatting/Output:** Rich
-- **LLM Provider:** Google Gemini API (via `gemini-2.5-flash-lite` by default)
+- **LLM Provider:** Google Gemini API (via `gemini-3-flash-preview` by default)
 
 ## Development Conventions & Commands
 

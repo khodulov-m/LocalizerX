@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
-from rich.table import Table
 
 from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config
@@ -20,7 +19,7 @@ from localizerx.io.frameit import (
 )
 from localizerx.translator.frameit_prompts import build_frameit_prompt
 from localizerx.translator.gemini_adapter import GeminiTranslator
-from localizerx.utils.locale import get_fastlane_locale_name, parse_fastlane_locale_list
+from localizerx.utils.locale import parse_fastlane_locale_list
 
 frameit_cmd = typer.Typer(help="Fastlane Frameit screenshot text translation")
 
@@ -65,14 +64,14 @@ def frameit(
         ensure_framefile(base_path)
         catalog = read_frameit_catalog(base_path, source_locale=src)
         source_metadata = catalog.get_source_metadata()
-        
+
         if not source_metadata or (not source_metadata.title_strings and not source_metadata.keyword_strings):
             source_metadata = catalog.get_or_create_locale(src)
             source_metadata.set_title("screenshot_1", "Your Catchy Title")
             source_metadata.set_keyword("screenshot_1", "KEYWORD")
             write_frameit_locale(base_path, source_metadata)
             console.print(f"[green]Created template in {base_path / src}[/green]")
-        
+
         console.print(f"[green]Frameit structure prepared in {base_path}[/green]")
         raise typer.Exit(0)
 
@@ -139,11 +138,11 @@ async def _run_translations(
     custom_prompt: str | None,
 ) -> None:
     cache_dir = get_cache_dir(config)
-    actual_model = model or config.translator.model
+    actual_model = model or config.frameit.model
 
     async with GeminiTranslator(
         model=actual_model,
-        max_retries=config.translator.max_retries,
+        max_retries=config.frameit.max_retries,
         cache_dir=cache_dir,
     ) as translator:
         with create_progress() as progress:

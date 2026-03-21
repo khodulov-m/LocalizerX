@@ -21,7 +21,7 @@ def mock_translator():
         translator_instance = mock.return_value
         translator_instance.__aenter__.return_value = translator_instance
         translator_instance.__aexit__.return_value = None
-        
+
         # Mock translate_batch to return success results
         async def mock_translate_batch(requests, src, target):
             from localizerx.translator.base import TranslationResult
@@ -34,7 +34,7 @@ def mock_translator():
                     success=True
                 ))
             return results
-            
+
         translator_instance.translate_batch = mock_translate_batch
         yield translator_instance
 
@@ -79,16 +79,16 @@ def test_mark_empty_flag(xcstrings_with_empty, mock_translator):
 
         # Verify file content
         catalog = read_xcstrings(file_path)
-        
+
         # 'hello' should have its translation from the mock
         assert "fr" in catalog.strings["hello"].translations
         assert catalog.strings["hello"].translations["fr"].value == "Translated-Hello"
-        
+
         # 'empty' should HAVE 'fr' with empty value (from mark-empty logic, NOT translation)
         assert "fr" in catalog.strings["empty"].translations
         assert catalog.strings["empty"].translations["fr"].value == ""
         assert catalog.strings["empty"].translations["fr"].state == "translated"
-        
+
         # 'space' should HAVE 'fr' with space value (from mark-empty logic, NOT translation)
         assert "fr" in catalog.strings["space"].translations
         assert catalog.strings["space"].translations["fr"].value == " "
@@ -101,7 +101,7 @@ def test_mark_empty_respects_overwrite(xcstrings_with_empty, mock_translator):
     xcstrings_with_empty["strings"]["empty"]["localizations"]["fr"] = {
         "stringUnit": {"state": "translated", "value": "Existing"}
     }
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         file_path = tmpdir / "Localizable.xcstrings"
@@ -110,14 +110,14 @@ def test_mark_empty_respects_overwrite(xcstrings_with_empty, mock_translator):
         # Run without overwrite - should only mark 1 (the space one)
         result = runner.invoke(app, ["translate", str(file_path), "--to", "fr", "--mark-empty"])
         assert "Marked 1 empty/whitespace string(s)" in result.stdout
-        
+
         catalog = read_xcstrings(file_path)
         assert catalog.strings["empty"].translations["fr"].value == "Existing"
 
         # Run with overwrite - should mark both
         result = runner.invoke(app, ["translate", str(file_path), "--to", "fr", "--mark-empty", "--overwrite"])
         assert "Marked 2 empty/whitespace string(s)" in result.stdout
-        
+
         catalog = read_xcstrings(file_path)
         assert catalog.strings["empty"].translations["fr"].value == ""
 
@@ -132,7 +132,7 @@ def test_mark_empty_multiple_targets(xcstrings_with_empty, mock_translator):
         # Run for fr, es
         result = runner.invoke(app, ["translate", str(file_path), "--to", "fr,es", "--mark-empty"])
         assert "Marked 4 empty/whitespace string(s)" in result.stdout  # 2 strings * 2 languages
-        
+
         catalog = read_xcstrings(file_path)
         assert "fr" in catalog.strings["empty"].translations
         assert "es" in catalog.strings["empty"].translations
@@ -146,7 +146,7 @@ def test_mark_empty_only(xcstrings_with_empty, mock_translator):
     xcstrings_with_empty["strings"]["hello"]["localizations"]["fr"] = {
         "stringUnit": {"state": "translated", "value": "Bonjour"}
     }
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         file_path = tmpdir / "Localizable.xcstrings"
@@ -157,7 +157,7 @@ def test_mark_empty_only(xcstrings_with_empty, mock_translator):
         result = runner.invoke(app, ["translate", str(file_path), "--to", "fr", "--mark-empty"])
         assert "Marked 2 empty/whitespace string(s)" in result.stdout
         assert "Saved " in result.stdout
-        
+
         catalog = read_xcstrings(file_path)
         assert "fr" in catalog.strings["empty"].translations
         assert catalog.strings["empty"].translations["fr"].value == ""

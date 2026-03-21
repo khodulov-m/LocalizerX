@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from localizerx.io.frameit import (
     ensure_framefile,
     read_frameit_catalog,

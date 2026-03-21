@@ -357,10 +357,10 @@ async def _translate_i18n(
     from localizerx.io.i18n import write_i18n
 
     cache_dir = get_cache_dir(config)
-    actual_batch_size = batch_size or config.translator.batch_size
-    actual_model = model or config.translator.model
+    actual_batch_size = batch_size or config.i18n.batch_size
+    actual_model = model or config.i18n.model
 
-    thinking_level = getattr(config.translator, "thinking_level", "0")
+    thinking_level = getattr(config.i18n, "thinking_level", "0")
     thinking_config = (
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
     )
@@ -369,7 +369,7 @@ async def _translate_i18n(
         thinking_config=thinking_config,
         model=actual_model,
         batch_size=actual_batch_size,
-        max_retries=config.translator.max_retries,
+        max_retries=config.i18n.max_retries,
         cache_dir=cache_dir,
     ) as translator:
         all_translations: dict[str, dict[str, str]] = {}  # locale -> {key: translated}

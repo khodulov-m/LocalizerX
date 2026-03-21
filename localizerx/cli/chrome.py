@@ -425,9 +425,9 @@ async def _translate_chrome(
     from localizerx.utils.limits import LimitAction, truncate_to_limit, validate_limit
 
     cache_dir = get_cache_dir(config)
-    actual_model = model or config.translator.model
+    actual_model = model or config.chrome.model
 
-    thinking_level = getattr(config.translator, "thinking_level", "0")
+    thinking_level = getattr(config.chrome, "thinking_level", "0")
     thinking_config = (
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
     )
@@ -435,8 +435,8 @@ async def _translate_chrome(
     async with GeminiTranslator(
         thinking_config=thinking_config,
         model=actual_model,
-        batch_size=config.translator.batch_size,
-        max_retries=config.translator.max_retries,
+        batch_size=config.chrome.batch_size,
+        max_retries=config.chrome.max_retries,
         cache_dir=cache_dir,
     ) as translator:
         all_translations: dict[str, dict[str, str]] = {}  # locale -> {key: translated}

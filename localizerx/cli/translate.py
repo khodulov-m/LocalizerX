@@ -538,18 +538,18 @@ async def _translate_file(
 ) -> None:
     """Perform translations and update catalog."""
     cache_dir = get_cache_dir(config)
-    actual_batch_size = batch_size or config.translator.batch_size
-    actual_model = model or config.translator.model
-    actual_temperature = temperature if temperature is not None else config.translator.temperature
-    actual_custom_instructions = custom_prompt or config.translator.custom_instructions
+    actual_batch_size = batch_size or config.translate.batch_size
+    actual_model = model or config.translate.model
+    actual_temperature = temperature if temperature is not None else config.translate.temperature
+    actual_custom_instructions = custom_prompt or config.translate.custom_instructions
 
     app_context = None
-    if config.translator.use_app_context and not no_app_context:
+    if config.translate.use_app_context and not no_app_context:
         app_context = extract_app_context_string(source_lang)
         if app_context:
             console.print("[dim]Using extracted app context for translations[/dim]")
 
-    thinking_level = getattr(config.translator, "thinking_level", "0")
+    thinking_level = getattr(config.translate, "thinking_level", "0")
     thinking_config = (
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
     )
@@ -558,7 +558,7 @@ async def _translate_file(
         thinking_config=thinking_config,
         model=actual_model,
         batch_size=actual_batch_size,
-        max_retries=config.translator.max_retries,
+        max_retries=config.translate.max_retries,
         cache_dir=cache_dir,
         temperature=actual_temperature,
         custom_instructions=actual_custom_instructions,

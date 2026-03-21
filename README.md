@@ -84,17 +84,24 @@ Create a configuration file to set your default languages and preferences:
 lrx init
 ```
 
-This creates a config file at `~/.config/localizerx/config.toml`. Here's a peek at what you can customize:
+This creates a config file at `~/.config/localizerx/config.toml`. Here is a peek at what you can customize:
 
 ```toml
 source_language = "en"
 default_targets = ["ru", "fr-FR", "pt-BR", "es-MX", "ja", "de-DE", "zh-Hans"]
 
 [translator]
-model = "gemini-2.5-flash-lite"
+model = "gemini-3-flash-preview"
+temperature = 1.0
+batch_size = 180
 use_app_context = true # Helps AI understand your app's context for better translations!
-cache_enabled = true
+
+# Command-specific overrides
+[metadata]
+model = "gemini-2.5-pro"
+batch_size = 50
 ```
+
 
 ---
 
