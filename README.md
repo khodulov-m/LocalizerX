@@ -25,13 +25,21 @@ Whether you're building a macOS app, a Chrome extension, or a web project, we've
 
 ## 🤖 AI Agent Integration
 
-Want your favorite AI coding assistant (Claude Code, Cursor, Windsurf, Gemini CLI) to handle localization autonomously? You can easily inject LocalizerX instructions into your project!
+Want your favorite AI coding assistant (Claude Code, Cursor, Windsurf, Gemini CLI) to handle localization autonomously? You can easily inject LocalizerX instructions into your project or install them globally!
 
 ```bash
+# Interactively choose your agent format
 lrx init-agent
+
+# OR install the Gemini CLI skill globally (~/.agents/skills/localizerx/)
+lrx init-agent --skill
 ```
 
-This will walk you through creating an `AGENT.md`, `.cursorrules`, or `.clinerules` file in your repository. Once installed, simply ask your AI to "Translate the app to French" and it will know exactly how to use the `lrx` CLI safely and effectively!
+This command allows you to:
+- **Project-level:** Create `AGENT.md`, `.cursorrules`, or `.clinerules` in your current repository.
+- **Global-level:** Install a persistent `Gemini CLI Skill` that you can activate with `/skills reload`.
+
+Once installed, simply ask your AI to **"Translate the app to French"** and it will know exactly how to use the `lrx` CLI safely and effectively!
 
 ---
 
