@@ -2,13 +2,15 @@
 
 > **Quick Tip:** You can use `lrx` as a handy shorthand for the `localizerx` command anywhere!
 
-Welcome to **LocalizerX**! The CLI tool designed to make your localization workflow seamless and fast. LocalizerX uses the power of the Gemini API to automatically translate your project assets across multiple platforms and formats.
+Welcome to **LocalizerX**!
+The CLI tool designed to make your localization workflow seamless and fast. LocalizerX uses the power of the Gemini API to automatically translate your project assets across multiple platforms and formats.
 
 ![LocalizerX Demo](assets/demo.png)
 
 ## Why LocalizerX?
 
-LocalizerX is built for developers who want to reach a global audience without the headache of manual translations. Whether you're building a macOS app, a Chrome extension, or a web project, we've got you covered!
+LocalizerX is built for developers who want to reach a global audience without the headache of manual translations or the risks of AI agents corrupting large localization files and wasting tokens.
+Whether you're building a macOS app, a Chrome extension, or a web project, we've got you covered!
 
 ### ✨ Key Features
 
