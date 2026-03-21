@@ -25,6 +25,7 @@ app = typer.Typer(
 
 # Import command modules after app is created (circular import prevention)
 from localizerx.cli import (  # noqa: E402
+    agent,
     android,
     chrome,
     delete,
@@ -368,3 +369,4 @@ app.command("screenshots")(screenshots.screenshots_translate)
 app.command("screenshots-info")(screenshots.screenshots_info)
 app.command("screenshots-generate")(screenshots.screenshots_generate)
 app.command("frameit")(frameit.frameit)
+app.command("init-agent")(agent.init_agent)

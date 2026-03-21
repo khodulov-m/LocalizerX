@@ -64,6 +64,7 @@ ignore = []
 # Prompt templates contain long lines inside triple-quoted strings
 "localizerx/translator/*prompts*.py" = ["E501"]
 "localizerx/translator/gemini_adapter.py" = ["E501"]
+"localizerx/cli/agent.py" = ["E501"]
 
 [tool.black]
 line-length = 100
