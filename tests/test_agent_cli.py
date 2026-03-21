@@ -56,3 +56,21 @@ def test_init_agent_prevents_duplicates(tmp_path: Path, monkeypatch: pytest.Monk
     # Content should not be doubled
     content = target_file.read_text()
     assert content.count("LocalizerX (lrx) Agent Instructions") == 1
+
+def test_init_agent_installs_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Test that init-agent --skill installs the skill to the home directory."""
+    # Mock home directory
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setenv("HOME", str(home_dir))
+    monkeypatch.setattr(Path, "home", lambda: home_dir)
+    
+    result = runner.invoke(app, ["init-agent", "--skill"])
+    
+    assert result.exit_code == 0
+    assert "Installed Gemini CLI skill" in result.stdout
+    
+    skill_file = home_dir / ".agents" / "skills" / "localizerx" / "SKILL.md"
+    assert skill_file.exists()
+    from localizerx.cli.agent import SKILL_INSTRUCTIONS
+    assert skill_file.read_text() == SKILL_INSTRUCTIONS
