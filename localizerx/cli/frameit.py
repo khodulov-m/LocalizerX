@@ -23,6 +23,7 @@ from localizerx.utils.locale import parse_fastlane_locale_list
 
 frameit_cmd = typer.Typer(help="Fastlane Frameit screenshot text translation")
 
+
 @frameit_cmd.callback(invoke_without_command=True)
 def frameit(
     ctx: typer.Context,
@@ -42,7 +43,9 @@ def frameit(
     ] = "en-US",
     prepare: Annotated[
         bool,
-        typer.Option("--prepare", help="Prepare frameit structure (Framefile.json and templates) and exit"),
+        typer.Option(
+            "--prepare", help="Prepare frameit structure (Framefile.json and templates) and exit"
+        ),
     ] = False,
     custom_prompt: Annotated[
         Optional[str],
@@ -65,7 +68,9 @@ def frameit(
         catalog = read_frameit_catalog(base_path, source_locale=src)
         source_metadata = catalog.get_source_metadata()
 
-        if not source_metadata or (not source_metadata.title_strings and not source_metadata.keyword_strings):
+        if not source_metadata or (
+            not source_metadata.title_strings and not source_metadata.keyword_strings
+        ):
             source_metadata = catalog.get_or_create_locale(src)
             source_metadata.set_title("screenshot_1", "Your Catchy Title")
             source_metadata.set_keyword("screenshot_1", "KEYWORD")
@@ -87,7 +92,9 @@ def frameit(
     ensure_framefile(base_path)
 
     # If source is missing or empty, create a template
-    if not source_metadata or (not source_metadata.title_strings and not source_metadata.keyword_strings):
+    if not source_metadata or (
+        not source_metadata.title_strings and not source_metadata.keyword_strings
+    ):
         console.print(
             f"[yellow]Source locale '{src}' not found or empty. Creating template...[/yellow]"
         )

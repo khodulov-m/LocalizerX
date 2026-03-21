@@ -176,7 +176,9 @@ class TestMetadataInfoCommand:
 
     def test_metadata_check_manual_path(self, sample_metadata_dir):
         """Test metadata-check command with a manually specified path."""
-        result = runner.invoke(app, ["metadata-check", str(sample_metadata_dir), "--skip-duplicates"])
+        result = runner.invoke(
+            app, ["metadata-check", str(sample_metadata_dir), "--skip-duplicates"]
+        )
         assert result.exit_code == 0
         assert "All fields are within character limits" in result.stdout
 

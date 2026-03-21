@@ -25,14 +25,14 @@ def mock_translator():
         # Mock translate_batch to return success results
         async def mock_translate_batch(requests, src, target):
             from localizerx.translator.base import TranslationResult
+
             results = []
             for r in requests:
-                results.append(TranslationResult(
-                    key=r.key,
-                    original=r.text,
-                    translated=f"Translated-{r.text}",
-                    success=True
-                ))
+                results.append(
+                    TranslationResult(
+                        key=r.key, original=r.text, translated=f"Translated-{r.text}", success=True
+                    )
+                )
             return results
 
         translator_instance.translate_batch = mock_translate_batch
@@ -68,7 +68,9 @@ def test_mark_empty_flag(xcstrings_with_empty, mock_translator):
 
         # Run translate with --mark-empty for French
         # Use --dry-run first to check output
-        result = runner.invoke(app, ["translate", str(file_path), "--to", "fr", "--mark-empty", "--dry-run"])
+        result = runner.invoke(
+            app, ["translate", str(file_path), "--to", "fr", "--mark-empty", "--dry-run"]
+        )
         assert result.exit_code == 0
         assert "Would mark 2 empty/whitespace string(s)" in result.stdout
 
@@ -115,7 +117,9 @@ def test_mark_empty_respects_overwrite(xcstrings_with_empty, mock_translator):
         assert catalog.strings["empty"].translations["fr"].value == "Existing"
 
         # Run with overwrite - should mark both
-        result = runner.invoke(app, ["translate", str(file_path), "--to", "fr", "--mark-empty", "--overwrite"])
+        result = runner.invoke(
+            app, ["translate", str(file_path), "--to", "fr", "--mark-empty", "--overwrite"]
+        )
         assert "Marked 2 empty/whitespace string(s)" in result.stdout
 
         catalog = read_xcstrings(file_path)

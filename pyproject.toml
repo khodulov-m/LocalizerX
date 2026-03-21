@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localizerx"
-version = "0.1.1"
+version = "0.1.2"
 description = "CLI tool for translating Xcode String Catalogs using Gemini API"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.10"
 authors = [
     {name = "LocalizerX Team"}
@@ -17,7 +17,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",

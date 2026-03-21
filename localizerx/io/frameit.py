@@ -36,13 +36,8 @@ def ensure_framefile(base_path: Path) -> None:
     framefile_path = base_path / "Framefile.json"
     if not framefile_path.exists():
         template = {
-            "default": {
-                "title": {
-                    "color": "#000000"
-                },
-                "background": "./background.png"
-            },
-            "data": []
+            "default": {"title": {"color": "#000000"}, "background": "./background.png"},
+            "data": [],
         }
         with open(framefile_path, "w", encoding="utf-8") as f:
             json.dump(template, f, indent=2)

@@ -327,7 +327,7 @@ class TestBatchRoundTrip:
 class TestScreenshotsConfigBatchSize:
     def test_default_batch_size(self):
         cfg = ScreenshotsConfig()
-        assert cfg.batch_size == 50
+        assert cfg.batch_size == 180
 
     def test_custom_batch_size(self):
         cfg = ScreenshotsConfig(batch_size=25)
@@ -338,8 +338,8 @@ class TestScreenshotsConfigBatchSize:
         assert cfg.batch_size == 1
 
     def test_batch_size_maximum_boundary(self):
-        cfg = ScreenshotsConfig(batch_size=50)
-        assert cfg.batch_size == 50
+        cfg = ScreenshotsConfig(batch_size=500)
+        assert cfg.batch_size == 500
 
     def test_batch_size_below_minimum_raises(self):
         from pydantic import ValidationError
@@ -351,4 +351,4 @@ class TestScreenshotsConfigBatchSize:
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            ScreenshotsConfig(batch_size=51)
+            ScreenshotsConfig(batch_size=501)

@@ -117,7 +117,7 @@ class TestConfig:
         """Config should have default translator settings."""
         config = Config()
         assert config.translator.provider == "gemini"
-        assert config.translator.batch_size == 100
+        assert config.translator.batch_size == 180
         assert config.translator.max_retries == 3
 
 
@@ -128,7 +128,7 @@ class TestTranslatorConfig:
         """TranslatorConfig should have correct defaults."""
         tc = TranslatorConfig()
         assert tc.provider == "gemini"
-        assert tc.batch_size == 100
+        assert tc.batch_size == 180
         assert tc.max_retries == 3
         assert tc.custom_instructions is None
         assert tc.use_app_context is True
@@ -146,15 +146,15 @@ class TestTranslatorConfig:
         tc = TranslatorConfig(batch_size=1)
         assert tc.batch_size == 1
 
-        tc = TranslatorConfig(batch_size=100)
-        assert tc.batch_size == 100
+        tc = TranslatorConfig(batch_size=180)
+        assert tc.batch_size == 180
 
         # Invalid batch_size should raise
         with pytest.raises(ValueError):
             TranslatorConfig(batch_size=0)
 
         with pytest.raises(ValueError):
-            TranslatorConfig(batch_size=101)
+            TranslatorConfig(batch_size=501)
 
     def test_translator_config_max_retries_validation(self):
         """TranslatorConfig should validate max_retries bounds."""

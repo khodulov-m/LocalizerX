@@ -152,6 +152,13 @@ def main(
             ),
         ),
     ] = False,
+    mark_empty: Annotated[
+        bool,
+        typer.Option(
+            "--mark-empty",
+            help="Mark empty or whitespace strings as translated for all target languages.",
+        ),
+    ] = False,
     remove: Annotated[
         Optional[str],
         typer.Option(
@@ -183,6 +190,7 @@ def main(
             custom_prompt=custom_prompt,
             no_app_context=no_app_context,
             refresh=False,
+            mark_empty=mark_empty,
             remove=remove,
         )
     elif ctx.invoked_subcommand is None:

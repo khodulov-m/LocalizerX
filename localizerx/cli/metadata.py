@@ -434,7 +434,7 @@ def metadata_check(
         locales_to_check = [loc for loc in locales_to_check if loc in catalog.locales]
 
         if not locales_to_check:
-            if locale: # Explicit locale requested
+            if locale:  # Explicit locale requested
                 console.print(f"[red]Error:[/red] No valid locales to check in {p}")
                 all_paths_valid = False
             else:
@@ -491,7 +491,9 @@ def metadata_check(
 
                 name_words = _extract_words(name_field.content) if name_field else set()
                 subtitle_words = _extract_words(subtitle_field.content) if subtitle_field else set()
-                keywords_words = _extract_keywords(keywords_field.content) if keywords_field else set()
+                keywords_words = (
+                    _extract_keywords(keywords_field.content) if keywords_field else set()
+                )
 
                 # Find duplicates between fields
                 name_in_keywords = name_words & keywords_words
@@ -537,7 +539,9 @@ def metadata_check(
             console.print("[green]✓ All fields are within character limits[/green]")
         else:
             all_paths_valid = False
-            console.print(f"[red]✗ Found {len(violations)} field(s) exceeding character limits[/red]")
+            console.print(
+                f"[red]✗ Found {len(violations)} field(s) exceeding character limits[/red]"
+            )
             console.print()
 
             # Show violations table
@@ -568,7 +572,8 @@ def metadata_check(
             console.print("[green]✓ No duplicate words between name/subtitle/keywords[/green]")
         else:
             console.print(
-                f"[yellow]⚠ Found {len(duplicates)} duplicate word issue(s) (ASO optimization)[/yellow]"
+                f"[yellow]⚠ Found {len(duplicates)} duplicate word issue(s) "
+                "(ASO optimization)[/yellow]"
             )
             console.print()
 
@@ -590,15 +595,17 @@ def metadata_check(
 
         # Summary
         if not all_valid or (not skip_duplicates and duplicates):
-             # Skip summary if there are issues
-             pass
+            # Skip summary if there are issues
+            pass
         else:
             console.print()
             summary_table = Table(title=f"Character Limit Summary ({p.name})")
             summary_table.add_column("Field", style="cyan")
             summary_table.add_column("Limit", style="white")
 
-            field_types_to_show = [field_type_filter] if field_type_filter else list(MetadataFieldType)
+            field_types_to_show = (
+                [field_type_filter] if field_type_filter else list(MetadataFieldType)
+            )
             for ft in field_types_to_show:
                 summary_table.add_row(ft.value, str(FIELD_LIMITS[ft]))
 
@@ -681,7 +688,9 @@ def metadata_urls(
                 file_path = locale_dir / filename
                 file_path.write_text(url + "\n", encoding="utf-8")
 
-        console.print(f"[green]Successfully updated URLs for {len(locales)} locales in {rel_path}[/green]")
+        console.print(
+            f"[green]Successfully updated URLs for {len(locales)} locales in {rel_path}[/green]"
+        )
 
 
 def _run_metadata_translate(

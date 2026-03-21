@@ -39,8 +39,8 @@ def test_remove_language_xcstrings(tmp_path):
         custom_prompt=None,
         no_app_context=True,
         refresh=False,
-    )
-
+        mark_empty=False,
+        )
     # Read back and verify
     with open(file_path, "r") as f:
         updated_content = json.load(f)
@@ -88,8 +88,8 @@ def test_remove_multiple_languages_xcstrings(tmp_path):
         custom_prompt=None,
         no_app_context=True,
         refresh=False,
-    )
-
+        mark_empty=False,
+        )
     # Read back and verify
     with open(file_path, "r") as f:
         updated_content = json.load(f)
