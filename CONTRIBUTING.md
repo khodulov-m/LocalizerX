@@ -32,20 +32,23 @@ pulls all of them in.
 
 ```
 localizerx/
-├── cli/                  # Typer CLI command definitions
-├── io/                   # File I/O: xcstrings, metadata, extensions, i18n, android
-├── parser/               # Data models and parsing logic
-├── translator/           # Translation provider interface and adapters
-│   ├── base.py           # Abstract Translator interface (see section 5)
-│   └── gemini_adapter.py # Gemini API implementation
+├── cli/                  # Framework & Drivers: Typer CLI command definitions
+├── core/                 # Core Layer: Domain & Application logic
+│   ├── use_cases/        # Application orchestrators (framework-agnostic)
+│   └── ports/            # Abstract interfaces (e.g., repository ports)
+├── adapters/             # Interface Adapters: Concrete port implementations
+├── io/                   # Low-level I/O handlers
+├── parser/               # Domain entities and Pydantic data models
+├── translator/           # Translation provider adapters
 └── utils/                # Shared utilities (placeholders, locales, limits)
 
 tests/                    # All test files live here
 pyproject.toml            # Project metadata, dependencies, and tool configuration
 ```
 
-Key design invariants that the codebase relies on:
+Key design principles:
 
+- **Clean Architecture:** Business logic is isolated from the CLI framework. Orchestration happens in Use Cases, which depend on abstract Ports.
 - **Lossless parsing:** a `read` followed by a `write` must preserve the original file
   structure exactly. Only translation entries are added.
 - **Placeholder masking:** placeholders (`%@`, `%d`, `{name}`, `$NAME$`, etc.) are
