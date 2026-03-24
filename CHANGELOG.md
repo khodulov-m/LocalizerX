@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Fixed `NameError: name 'asyncio' is not defined` in `lrx metadata` command during non-dry-run translation.
+
+### Added
+- Comprehensive test suite for metadata translation scenarios, covering character limits (warn/truncate/error), interactive previews, overwrite behavior, and untranslatable file copying.
+
 ## [0.1.2] - 2026-03-21
 
 ### Added

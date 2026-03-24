@@ -1,5 +1,6 @@
 """Use cases for translating App Store metadata."""
 
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
