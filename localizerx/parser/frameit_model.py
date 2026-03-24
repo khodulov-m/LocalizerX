@@ -47,3 +47,44 @@ class FrameitCatalog(BaseModel):
     def get_source_metadata(self) -> FrameitLocale | None:
         """Get the source locale metadata."""
         return self.locales.get(self.source_locale)
+
+    def get_strings_needing_translation(
+        self,
+        target_locale: str,
+        overwrite: bool = False,
+    ) -> tuple[list[FrameitString], list[FrameitString]]:
+        """
+        Get source strings that need translation for a target locale.
+        Returns (titles, keywords) tuple.
+        """
+        source = self.get_source_metadata()
+        if not source:
+            return [], []
+
+        target = self.get_locale(target_locale)
+        
+        needs_titles = []
+        for key, src_str in source.title_strings.items():
+            if not src_str.value.strip():
+                continue
+            if overwrite:
+                needs_titles.append(src_str)
+                continue
+            if target is None or key not in target.title_strings:
+                needs_titles.append(src_str)
+            elif not target.title_strings[key].value.strip():
+                needs_titles.append(src_str)
+
+        needs_keywords = []
+        for key, src_str in source.keyword_strings.items():
+            if not src_str.value.strip():
+                continue
+            if overwrite:
+                needs_keywords.append(src_str)
+                continue
+            if target is None or key not in target.keyword_strings:
+                needs_keywords.append(src_str)
+            elif not target.keyword_strings[key].value.strip():
+                needs_keywords.append(src_str)
+
+        return needs_titles, needs_keywords

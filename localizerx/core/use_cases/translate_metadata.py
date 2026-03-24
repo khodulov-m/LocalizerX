@@ -1,0 +1,216 @@
+"""Use cases for translating App Store metadata."""
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable
+
+from localizerx.core.ports.repository import CatalogRepository
+from localizerx.parser.metadata_model import MetadataCatalog, MetadataFieldType
+from localizerx.translator.base import TranslationRequest, Translator
+
+@dataclass
+class MetadataTranslationTask:
+    locale: str
+    field_types: list[MetadataFieldType] = field(default_factory=list)
+
+from localizerx.utils.limits import LimitAction, truncate_to_limit, validate_limit
+
+@dataclass
+class TranslateMetadataRequest:
+    path: Path
+    source_locale: str
+    target_locales: list[str]
+    field_types: list[MetadataFieldType] | None = None
+    dry_run: bool = False
+    preview: bool = False
+    overwrite: bool = False
+    limit_action: LimitAction = LimitAction.WARN
+    backup: bool = False
+
+@dataclass
+class MetadataTranslationPreview:
+    locale: str
+    field_type: MetadataFieldType
+    translation: str
+    chars: int = 0
+    limit: int = 0
+    is_over_limit: bool = False
+
+@dataclass
+class TranslateMetadataResult:
+    tasks: dict[str, MetadataTranslationTask] = field(default_factory=dict)
+    preview_items: list[MetadataTranslationPreview] = field(default_factory=list)
+    limit_warnings: list[str] = field(default_factory=list)
+    saved: bool = False
+
+class TranslateMetadataUseCase:
+    """Orchestrates the translation of App Store metadata."""
+
+    def __init__(self, repository: CatalogRepository[MetadataCatalog], translator: Translator):
+        self.repository = repository
+        self.translator = translator
+
+    async def execute(
+        self,
+        request: TranslateMetadataRequest,
+        on_task_summary: Callable[[dict[str, MetadataTranslationTask]], None] | None = None,
+        on_translation_start: Callable[[str, int], Any] | None = None,
+        on_translation_progress: Callable[[Any, int], None] | None = None,
+        on_preview_request: Callable[[list[MetadataTranslationPreview]], bool] | None = None,
+    ) -> TranslateMetadataResult:
+        """Execute App Store metadata translation workflow."""
+        from localizerx.translator.metadata_prompts import (
+            build_batch_metadata_prompt,
+            build_keywords_prompt,
+            build_metadata_prompt,
+            parse_batch_metadata_response,
+        )
+        
+        catalog = self.repository.read(request.path, source_locale=request.source_locale)
+        
+        tasks = {}
+        for target_locale in request.target_locales:
+            fields = catalog.get_fields_needing_translation(
+                target_locale, 
+                field_types=request.field_types,
+                overwrite=request.overwrite
+            )
+            if fields:
+                tasks[target_locale] = MetadataTranslationTask(locale=target_locale, field_types=fields)
+
+        result = TranslateMetadataResult(tasks=tasks)
+        
+        if not tasks:
+            return result
+
+        if on_task_summary:
+            on_task_summary(tasks)
+
+        if request.dry_run:
+            return result
+
+        all_results = {} # locale -> {field_type: translation}
+        limit_warnings = []
+        source_meta = catalog.get_source_metadata()
+
+        semaphore = asyncio.Semaphore(5)
+
+        async def _translate_locale(target_locale: str, field_types: list[MetadataFieldType]) -> dict[MetadataFieldType, str]:
+            async with semaphore:
+                items: list[tuple[MetadataFieldType, str]] = []
+                for ft in field_types:
+                    f = source_meta.get_field(ft)
+                    if f:
+                        items.append((ft, f.content))
+
+                if not items:
+                    return {}
+
+                task_id = on_translation_start(target_locale, len(items)) if on_translation_start else None
+
+                res_dict = {}
+                if len(items) == 1:
+                    ft, text = items[0]
+                    if ft == MetadataFieldType.KEYWORDS:
+                        prompt = build_keywords_prompt(text, request.source_locale, target_locale)
+                    else:
+                        prompt = build_metadata_prompt(text, ft, request.source_locale, target_locale)
+                    
+                    translated = await self.translator._call_api(prompt)
+                    res_dict[ft] = translated.strip()
+                    if on_translation_progress and task_id:
+                        on_translation_progress(task_id, 1)
+                else:
+                    prompt = build_batch_metadata_prompt(items, request.source_locale, target_locale)
+                    response = await self.translator._call_api(prompt)
+                    translations = parse_batch_metadata_response(response, len(items))
+
+                    for (ft, _), translated in zip(items, translations):
+                        if translated:
+                            res_dict[ft] = translated
+                        if on_translation_progress and task_id:
+                            on_translation_progress(task_id, 1)
+                
+                return res_dict
+
+        # Run locales concurrently
+        locale_results = await asyncio.gather(
+            *[_translate_locale(loc, t.field_types) for loc, t in tasks.items()],
+            return_exceptions=True
+        )
+
+        for loc, res in zip(tasks.keys(), locale_results):
+            if isinstance(res, Exception):
+                # Handle or log error
+                continue
+            all_results[loc] = res
+
+        # Validate character limits
+        for target_locale, translations in all_results.items():
+            for field_type, translated in list(translations.items()):
+                validation = validate_limit(translated, field_type)
+                if not validation.is_valid:
+                    warning = (
+                        f"[{target_locale}] {field_type.value}: "
+                        f"{validation.char_count}/{validation.limit} chars "
+                        f"(over by {validation.chars_over})"
+                    )
+                    limit_warnings.append(warning)
+
+                    if request.limit_action == LimitAction.ERROR:
+                        raise ValueError(f"Character limit exceeded: {warning}")
+                    elif request.limit_action == LimitAction.TRUNCATE:
+                        all_results[target_locale][field_type] = truncate_to_limit(translated, field_type)
+
+        result.limit_warnings = limit_warnings
+
+        if request.preview and on_preview_request:
+            preview_items = []
+            for locale, res in all_results.items():
+                for field_type, value in res.items():
+                    validation = validate_limit(value, field_type)
+                    preview_items.append(MetadataTranslationPreview(
+                        locale=locale, 
+                        field_type=field_type, 
+                        translation=value,
+                        chars=validation.char_count,
+                        limit=validation.limit,
+                        is_over_limit=not validation.is_valid
+                    ))
+            
+            if not on_preview_request(preview_items):
+                return result
+
+        # Apply results
+        for locale, res in all_results.items():
+            locale_data = catalog.get_or_create_locale(locale)
+            for field_type, value in res.items():
+                locale_data.set_field(field_type, value)
+
+        # Save
+        self.repository.write(catalog, request.path)
+        
+        # Copy untranslatable files
+        import shutil
+        untranslatable_files = [
+            "marketing_url.txt",
+            "privacy_url.txt",
+            "support_url.txt",
+            "apple_tv_privacy_policy.txt",
+        ]
+        source_dir = request.path / request.source_locale
+        if source_dir.exists():
+            for target_locale in all_results.keys():
+                target_dir = request.path / target_locale
+                target_dir.mkdir(parents=True, exist_ok=True)
+                for filename in untranslatable_files:
+                    src_file = source_dir / filename
+                    if src_file.exists():
+                        dst_file = target_dir / filename
+                        if request.backup and dst_file.exists():
+                            backup_path = dst_file.with_suffix(".txt.backup")
+                            shutil.copy2(dst_file, backup_path)
+                        shutil.copy2(src_file, dst_file)
+
+        result.saved = True
+        return result

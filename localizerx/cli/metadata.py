@@ -13,6 +13,13 @@ from rich.table import Table
 from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.gemini_adapter import GeminiTranslator
+from localizerx.adapters.repository import MetadataCatalogRepository
+from localizerx.core.use_cases.translate_metadata import (
+    MetadataTranslationPreview,
+    MetadataTranslationTask,
+    TranslateMetadataRequest,
+    TranslateMetadataUseCase,
+)
 from localizerx.utils.locale import (
     get_fastlane_locale_name,
     parse_fastlane_locale_list,
@@ -748,14 +755,24 @@ def _run_metadata_translate(
             console.print("[red]Error:[/red] No valid fields specified")
             raise typer.Exit(1)
 
-    # Read metadata
+    repository = MetadataCatalogRepository()
+    
+    cache_dir = get_cache_dir(config)
+    actual_model = model or config.metadata.model
+    actual_temperature = temperature if temperature is not None else config.metadata.temperature
+    
+    thinking_level = getattr(config.metadata, "thinking_level", "0")
+    thinking_config = (
+        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    )
+
+    # Read metadata early to validate source locale
     try:
-        catalog = read_metadata(path, source_locale=src)
+        catalog = repository.read(path, source_locale=src)
     except (FileNotFoundError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
 
-    # Check source locale exists
     source = catalog.get_source_metadata()
     if not source:
         console.print(f"[red]Error:[/red] Source locale '{src}' not found in metadata")
@@ -768,58 +785,112 @@ def _run_metadata_translate(
     console.print(f"[bold]Targets:[/bold] {target_display}")
     console.print()
 
-    # Determine fields to translate for each locale
-    translation_tasks: dict[str, list[MetadataFieldType]] = {}
+    # Callbacks
+    def on_task_summary(tasks: dict[str, MetadataTranslationTask]):
+        for locale, task in tasks.items():
+            field_names = ", ".join(f.value for f in task.field_types)
+            console.print(f"  {get_fastlane_locale_name(locale)}: {field_names}")
+            
+        if dry_run:
+            console.print("\n[yellow]Dry run - no changes made[/yellow]")
+            # Use the catalog we already read
+            _show_metadata_dry_run_from_tasks(catalog, tasks)
 
-    for target_locale in target_locales:
-        # Get fields needing translation
-        needs = catalog.get_fields_needing_translation(target_locale, field_types)
+    progress = None
+    
+    def on_translation_start(locale: str, total: int):
+        nonlocal progress
+        if not progress:
+            progress = create_progress()
+            progress.start()
+        # console.print(f"  Translating to {get_fastlane_locale_name(locale)}...")
+        return progress.add_task(f"Translating metadata...", total=total)
 
-        # If overwrite, translate all specified fields that exist in source
-        if overwrite:
-            if field_types:
-                needs = [ft for ft in field_types if source.has_field(ft)]
-            else:
-                needs = [ft for ft in MetadataFieldType if source.has_field(ft)]
+    def on_translation_progress(task_id, advance_by):
+        if progress:
+            progress.advance(task_id, advance_by)
 
-        if needs:
-            translation_tasks[target_locale] = needs
+    def on_preview_request(items: list[MetadataTranslationPreview]) -> bool:
+        if progress:
+            progress.stop()
+        table = Table(title="Translation Preview")
+        table.add_column("Locale", style="cyan")
+        table.add_column("Field", style="white")
+        table.add_column("Translation", style="green")
+        table.add_column("Chars", style="yellow")
+        
+        for i, item in enumerate(items):
+            if i >= 20:
+                break
+            preview_value = item.translation[:60] + "..." if len(item.translation) > 60 else item.translation
+            preview_value = preview_value.replace("\n", " ")
+            
+            chars_display = str(item.chars)
+            if item.is_over_limit:
+                chars_display = f"[red]{chars_display} (limit {item.limit})[/red]"
+                
+            table.add_row(item.locale, item.field_type.value, preview_value, chars_display)
+            
+        if len(items) > 20:
+            table.add_row("...", "", "", f"({len(items) - 20} more)")
+            
+        console.print(table)
+        apply = typer.confirm("Apply these translations?")
+        if not apply:
+            console.print("  [yellow]Cancelled[/yellow]")
+        return apply
 
-    if not translation_tasks:
-        console.print("[green]All fields already translated[/green]")
-        return
+    async def _run_async():
+        async with GeminiTranslator(
+            thinking_config=thinking_config,
+            model=actual_model,
+            max_retries=config.metadata.max_retries,
+            cache_dir=cache_dir,
+            temperature=actual_temperature,
+        ) as translator:
+            
+            use_case = TranslateMetadataUseCase(repository=repository, translator=translator)
+            request = TranslateMetadataRequest(
+                path=path,
+                source_locale=src,
+                target_locales=target_locales,
+                field_types=field_types,
+                dry_run=dry_run,
+                preview=preview,
+                overwrite=overwrite,
+                limit_action=limit_action,
+                backup=backup,
+            )
+            
+            try:
+                result = await use_case.execute(
+                    request=request,
+                    on_task_summary=on_task_summary,
+                    on_translation_start=on_translation_start,
+                    on_translation_progress=on_translation_progress,
+                    on_preview_request=on_preview_request,
+                )
+                
+                if result.saved:
+                    console.print(f"\n[green]Saved translations to {path}[/green]")
+                elif not result.tasks and not dry_run:
+                     console.print("[green]All fields already translated[/green]")
+                
+                if result.limit_warnings:
+                    console.print(f"\n[yellow]Character limit warnings ({len(result.limit_warnings)}):[/yellow]")
+                    for warning in result.limit_warnings[:10]:
+                        console.print(f"  {warning}")
+                    if len(result.limit_warnings) > 10:
+                        console.print(f"  ... and {len(result.limit_warnings) - 10} more")
+                     
+            finally:
+                if progress:
+                    progress.stop()
 
-    # Show summary
-    for locale, locale_fields in translation_tasks.items():
-        field_names = ", ".join(f.value for f in locale_fields)
-        console.print(f"  {get_fastlane_locale_name(locale)}: {field_names}")
-
-    if dry_run:
-        console.print("\n[yellow]Dry run - no changes made[/yellow]")
-        _show_metadata_dry_run(catalog, translation_tasks)
-        return
-
-    # Perform translation
-    asyncio.run(
-        _translate_metadata(
-            catalog=catalog,
-            path=path,
-            source_locale=src,
-            translation_tasks=translation_tasks,
-            config=config,
-            limit_action=limit_action,
-            preview=preview,
-            backup=backup,
-            model=model,
-            temperature=temperature,
-        )
-    )
+    asyncio.run(_run_async())
 
 
-def _show_metadata_dry_run(
-    catalog,
-    tasks: dict[str, list],
-) -> None:
+def _show_metadata_dry_run_from_tasks(catalog, tasks: dict[str, MetadataTranslationTask]) -> None:
     """Show table of fields that would be translated."""
     from localizerx.parser.metadata_model import FIELD_LIMITS
 
@@ -833,8 +904,8 @@ def _show_metadata_dry_run(
     table.add_column("Source Length", style="yellow")
     table.add_column("Limit", style="green")
 
-    for locale, fields in tasks.items():
-        for field_type in fields:
+    for locale, task in tasks.items():
+        for field_type in task.field_types:
             field = source.get_field(field_type)
             if field:
                 table.add_row(
@@ -843,220 +914,5 @@ def _show_metadata_dry_run(
                     str(field.char_count),
                     str(FIELD_LIMITS[field_type]),
                 )
-
-    console.print(table)
-
-
-async def _translate_metadata(
-    catalog,
-    path: Path,
-    source_locale: str,
-    translation_tasks: dict[str, list],
-    config,
-    limit_action,
-    preview: bool,
-    backup: bool,
-    model: str | None,
-    temperature: float | None,
-) -> None:
-    """Perform metadata translations and update files.
-
-    All fields for each locale are sent in a single batched API call.
-    Locales are translated concurrently (up to 5 in parallel).
-    """
-    from localizerx.io.metadata import write_metadata
-    from localizerx.parser.metadata_model import MetadataFieldType
-    from localizerx.translator.metadata_prompts import (
-        build_batch_metadata_prompt,
-        build_keywords_prompt,
-        build_metadata_prompt,
-        parse_batch_metadata_response,
-    )
-    from localizerx.utils.limits import LimitAction, truncate_to_limit, validate_limit
-
-    cache_dir = get_cache_dir(config)
-    actual_model = model or config.metadata.model
-    actual_temperature = temperature if temperature is not None else config.metadata.temperature
-
-    source = catalog.get_source_metadata()
-    if not source:
-        return
-
-    semaphore = asyncio.Semaphore(5)
-
-    thinking_level = getattr(config.metadata, "thinking_level", "0")
-    thinking_config = (
-        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
-    )
-
-    async with GeminiTranslator(
-        thinking_config=thinking_config,
-        model=actual_model,
-        max_retries=config.metadata.max_retries,
-        cache_dir=cache_dir,
-        temperature=actual_temperature,
-    ) as translator:
-        all_translations: dict[str, dict[MetadataFieldType, str]] = {}
-
-        async def _translate_locale(
-            target_locale: str, field_types: list[MetadataFieldType]
-        ) -> tuple[str, dict[MetadataFieldType, str]]:
-            """Translate all fields for one locale in a single batch API call."""
-            async with semaphore:
-                items: list[tuple[MetadataFieldType, str]] = []
-                for ft in field_types:
-                    field = source.get_field(ft)
-                    if field:
-                        items.append((ft, field.content))
-
-                if not items:
-                    return target_locale, {}
-
-                # Single field — use the specialized prompt for best quality
-                if len(items) == 1:
-                    ft, text = items[0]
-                    if ft == MetadataFieldType.KEYWORDS:
-                        prompt = build_keywords_prompt(text, source_locale, target_locale)
-                    else:
-                        prompt = build_metadata_prompt(text, ft, source_locale, target_locale)
-                    response = await translator._call_api(prompt)
-                    return target_locale, {ft: response.strip()}
-
-                # Multiple fields — batch into a single API call
-                prompt = build_batch_metadata_prompt(items, source_locale, target_locale)
-                response = await translator._call_api(prompt)
-                translations = parse_batch_metadata_response(response, len(items))
-
-                result: dict[MetadataFieldType, str] = {}
-                for (ft, _), translated in zip(items, translations):
-                    if translated:
-                        result[ft] = translated
-                return target_locale, result
-
-        with create_progress() as progress:
-            progress_task = progress.add_task(
-                "Translating metadata...", total=len(translation_tasks)
-            )
-
-            async def _with_progress(target_locale, field_types):
-                try:
-                    return await _translate_locale(target_locale, field_types)
-                finally:
-                    progress.advance(progress_task)
-
-            results = await asyncio.gather(
-                *[_with_progress(loc, fields) for loc, fields in translation_tasks.items()],
-                return_exceptions=True,
-            )
-
-            for result in results:
-                if isinstance(result, Exception):
-                    console.print(f"    [red]Error: {result}[/red]")
-                else:
-                    locale, translations = result
-                    all_translations[locale] = translations
-
-        # Validate character limits
-        limit_warnings: list[str] = []
-        for target_locale, translations in all_translations.items():
-            for field_type, translated in list(translations.items()):
-                validation = validate_limit(translated, field_type)
-                if not validation.is_valid:
-                    warning = (
-                        f"[{target_locale}] {field_type.value}: "
-                        f"{validation.char_count}/{validation.limit} chars "
-                        f"(over by {validation.chars_over})"
-                    )
-                    limit_warnings.append(warning)
-
-                    if limit_action == LimitAction.ERROR:
-                        console.print(f"    [red]Error: {warning}[/red]")
-                        raise typer.Exit(1)
-                    elif limit_action == LimitAction.TRUNCATE:
-                        all_translations[target_locale][field_type] = truncate_to_limit(
-                            translated, field_type
-                        )
-                        console.print(
-                            f"    [yellow]Truncated: [{target_locale}] {field_type.value}[/yellow]"
-                        )
-                    else:  # warn
-                        console.print(f"    [yellow]Warning: {warning}[/yellow]")
-
-        # Show preview if requested
-        if preview:
-            _show_metadata_preview(source, all_translations)
-            if not typer.confirm("Apply these translations?"):
-                console.print("  [yellow]Cancelled[/yellow]")
-                return
-
-        # Update catalog and write files
-        for target_locale, translations in all_translations.items():
-            locale_meta = catalog.get_or_create_locale(target_locale)
-            for field_type, value in translations.items():
-                locale_meta.set_field(field_type, value)
-
-        write_metadata(
-            catalog,
-            path,
-            backup=backup,
-            locales=list(all_translations.keys()),
-        )
-
-        # Copy untranslatable files from source locale to target locales
-        import shutil
-
-        untranslatable_files = [
-            "marketing_url.txt",
-            "privacy_url.txt",
-            "support_url.txt",
-            "apple_tv_privacy_policy.txt",
-        ]
-        source_dir = path / source_locale
-        if source_dir.exists():
-            for target_locale in all_translations.keys():
-                target_dir = path / target_locale
-                target_dir.mkdir(parents=True, exist_ok=True)
-                for filename in untranslatable_files:
-                    src_file = source_dir / filename
-                    if src_file.exists():
-                        dst_file = target_dir / filename
-                        if backup and dst_file.exists():
-                            backup_path = dst_file.with_suffix(".txt.backup")
-                            shutil.copy2(dst_file, backup_path)
-                        shutil.copy2(src_file, dst_file)
-
-        console.print(f"\n[green]Saved translations to {path}[/green]")
-
-        if limit_warnings:
-            console.print(f"\n[yellow]Character limit warnings ({len(limit_warnings)}):[/yellow]")
-            for warning in limit_warnings[:10]:
-                console.print(f"  {warning}")
-            if len(limit_warnings) > 10:
-                console.print(f"  ... and {len(limit_warnings) - 10} more")
-
-
-def _show_metadata_preview(source, all_translations: dict) -> None:
-    """Show preview of metadata translations."""
-    table = Table(title="Translation Preview")
-    table.add_column("Locale", style="cyan")
-    table.add_column("Field", style="white")
-    table.add_column("Translation", style="green")
-    table.add_column("Chars", style="yellow")
-
-    count = 0
-    for locale, translations in all_translations.items():
-        for field_type, value in translations.items():
-            preview_value = value[:60] + "..." if len(value) > 60 else value
-            preview_value = preview_value.replace("\n", " ")
-            table.add_row(locale, field_type.value, preview_value, str(len(value)))
-            count += 1
-            if count >= 20:
-                break
-        if count >= 20:
-            break
-
-    total = sum(len(t) for t in all_translations.values())
-    if total > 20:
-        table.add_row("...", "", f"({total - 20} more)", "")
 
     console.print(table)

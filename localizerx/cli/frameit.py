@@ -3,23 +3,28 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
+from rich.table import Table
 
 from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config
 from localizerx.io.frameit import (
     detect_frameit_path,
     ensure_framefile,
-    read_frameit_catalog,
     write_frameit_locale,
 )
-from localizerx.translator.frameit_prompts import build_frameit_prompt
 from localizerx.translator.gemini_adapter import GeminiTranslator
-from localizerx.utils.locale import parse_fastlane_locale_list
+from localizerx.utils.locale import get_fastlane_locale_name, parse_fastlane_locale_list
+from localizerx.adapters.repository import FrameitCatalogRepository
+from localizerx.core.use_cases.translate_frameit import (
+    FrameitTranslationPreview,
+    FrameitTranslationTask,
+    TranslateFrameitRequest,
+    TranslateFrameitUseCase,
+)
 
 frameit_cmd = typer.Typer(help="Fastlane Frameit screenshot text translation")
 
@@ -55,6 +60,14 @@ def frameit(
         Optional[str],
         typer.Option("--model", "-m", help="Gemini model to use"),
     ] = None,
+    overwrite: Annotated[
+        bool,
+        typer.Option("--overwrite", help="Overwrite existing translations"),
+    ] = False,
+    preview: Annotated[
+        bool,
+        typer.Option("--preview", "-p", help="Preview translations before applying"),
+    ] = False,
 ) -> None:
     """Translate frameit title.strings and keyword.strings to target locales."""
     if ctx.invoked_subcommand is not None:
@@ -62,10 +75,11 @@ def frameit(
 
     config = load_config()
     base_path = path if path else detect_frameit_path()
+    repository = FrameitCatalogRepository()
 
     if prepare:
         ensure_framefile(base_path)
-        catalog = read_frameit_catalog(base_path, source_locale=src)
+        catalog = repository.read(base_path, source_locale=src)
         source_metadata = catalog.get_source_metadata()
 
         if not source_metadata or (
@@ -85,11 +99,17 @@ def frameit(
         console.print("[red]Error:[/red] No target locales specified.")
         raise typer.Exit(1)
 
-    catalog = read_frameit_catalog(base_path, source_locale=src)
-    source_metadata = catalog.get_source_metadata()
-
     # Initialize Framefile if needed
     ensure_framefile(base_path)
+
+    # Read catalog early to validate source
+    try:
+        catalog = repository.read(base_path, source_locale=src)
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    source_metadata = catalog.get_source_metadata()
 
     # If source is missing or empty, create a template
     if not source_metadata or (
@@ -108,95 +128,95 @@ def frameit(
 
     console.print(f"[bold]Frameit path:[/bold] {base_path}")
     console.print(f"[bold]Source locale:[/bold] {src}")
+    target_display = ", ".join(f"{get_fastlane_locale_name(loc)} ({loc})" for loc in target_locales)
+    console.print(f"[bold]Targets:[/bold] {target_display}")
+    console.print()
 
-    # Calculate tasks
-    tasks = []
-    for tgt in target_locales:
-        tgt_metadata = catalog.get_locale(tgt)
+    # Callbacks
+    def on_task_summary(tasks: dict[str, FrameitTranslationTask]):
+        for locale, task in tasks.items():
+            parts = []
+            if task.titles:
+                parts.append(f"{len(task.titles)} title(s)")
+            if task.keywords:
+                parts.append(f"{len(task.keywords)} keyword(s)")
+            console.print(f"  {get_fastlane_locale_name(locale)}: {', '.join(parts)}")
 
-        missing_titles = {}
-        missing_keywords = {}
+    progress = None
+    
+    def on_translation_start(locale: str, total: int):
+        nonlocal progress
+        if not progress:
+            progress = create_progress()
+            progress.start()
+        console.print(f"  Translating to {get_fastlane_locale_name(locale)}...")
+        return progress.add_task(f"    {locale}", total=total)
 
-        for k, v in source_metadata.title_strings.items():
-            if not tgt_metadata or k not in tgt_metadata.title_strings:
-                missing_titles[k] = v.value
+    def on_translation_progress(task_id, advance_by):
+        if progress:
+            progress.advance(task_id, advance_by)
 
-        for k, v in source_metadata.keyword_strings.items():
-            if not tgt_metadata or k not in tgt_metadata.keyword_strings:
-                missing_keywords[k] = v.value
+    def on_preview_request(items: list[FrameitTranslationPreview]) -> bool:
+        if progress:
+            progress.stop()
+        table = Table(title="Translation Preview")
+        table.add_column("Locale", style="cyan")
+        table.add_column("Type", style="yellow")
+        table.add_column("Key", style="white")
+        table.add_column("Translation", style="green")
+        
+        for i, item in enumerate(items):
+            if i >= 20:
+                break
+            table.add_row(item.locale, item.type, item.key, item.translation)
+            
+        if len(items) > 20:
+            table.add_row("...", "", "", f"({len(items) - 20} more)")
+            
+        console.print(table)
+        apply = typer.confirm("Apply these translations?")
+        if not apply:
+            console.print("  [yellow]Cancelled[/yellow]")
+        return apply
 
-        if missing_titles or missing_keywords:
-            tasks.append((tgt, missing_titles, missing_keywords))
+    async def _run_async():
+        cache_dir = get_cache_dir(config)
+        actual_model = model or config.frameit.model
 
-    if not tasks:
-        console.print("[green]All strings are already translated.[/green]")
-        return
+        async with GeminiTranslator(
+            model=actual_model,
+            max_retries=config.frameit.max_retries,
+            cache_dir=cache_dir,
+            custom_instructions=custom_prompt,
+        ) as translator:
+            
+            use_case = TranslateFrameitUseCase(repository=repository, translator=translator)
+            request = TranslateFrameitRequest(
+                path=base_path,
+                source_locale=src,
+                target_locales=target_locales,
+                dry_run=False,
+                preview=preview,
+                overwrite=overwrite,
+                custom_instructions=custom_prompt,
+            )
+            
+            try:
+                result = await use_case.execute(
+                    request=request,
+                    on_task_summary=on_task_summary,
+                    on_translation_start=on_translation_start,
+                    on_translation_progress=on_translation_progress,
+                    on_preview_request=on_preview_request,
+                )
+                
+                if result.saved:
+                    console.print(f"\n[green]Saved translations to {base_path}[/green]")
+                elif not result.tasks:
+                     console.print("[green]All strings already translated[/green]")
+                     
+            finally:
+                if progress:
+                    progress.stop()
 
-    asyncio.run(_run_translations(base_path, catalog, src, tasks, config, model, custom_prompt))
-
-
-async def _run_translations(
-    base_path: Path,
-    catalog,
-    src_lang: str,
-    tasks: list,
-    config,
-    model: str | None,
-    custom_prompt: str | None,
-) -> None:
-    cache_dir = get_cache_dir(config)
-    actual_model = model or config.frameit.model
-
-    async with GeminiTranslator(
-        model=actual_model,
-        max_retries=config.frameit.max_retries,
-        cache_dir=cache_dir,
-    ) as translator:
-        with create_progress() as progress:
-            total_items = sum(len(t) + len(k) for _, t, k in tasks)
-            p_task = progress.add_task("Translating", total=total_items)
-
-            for tgt, missing_titles, missing_keywords in tasks:
-                tgt_locale = catalog.get_or_create_locale(tgt)
-
-                # Translate titles
-                if missing_titles:
-                    prompt = build_frameit_prompt(missing_titles, src_lang, tgt, custom_prompt)
-                    try:
-                        resp = await translator._call_api(prompt)
-                        # Remove markdown code blocks if any
-                        if resp.startswith("```json"):
-                            resp = resp.replace("```json", "").replace("```", "").strip()
-                        elif resp.startswith("```"):
-                            resp = resp.replace("```", "").strip()
-
-                        translated = json.loads(resp)
-                        for k, v in translated.items():
-                            tgt_locale.set_title(k, v)
-
-                    except Exception as e:
-                        console.print(f"[red]Error translating titles to {tgt}:[/red] {e}")
-
-                    progress.advance(p_task, advance=len(missing_titles))
-
-                # Translate keywords
-                if missing_keywords:
-                    prompt = build_frameit_prompt(missing_keywords, src_lang, tgt, custom_prompt)
-                    try:
-                        resp = await translator._call_api(prompt)
-                        if resp.startswith("```json"):
-                            resp = resp.replace("```json", "").replace("```", "").strip()
-                        elif resp.startswith("```"):
-                            resp = resp.replace("```", "").strip()
-
-                        translated = json.loads(resp)
-                        for k, v in translated.items():
-                            tgt_locale.set_keyword(k, v)
-
-                    except Exception as e:
-                        console.print(f"[red]Error translating keywords to {tgt}:[/red] {e}")
-
-                    progress.advance(p_task, advance=len(missing_keywords))
-
-                write_frameit_locale(base_path, tgt_locale)
-                console.print(f"  [green]Translated {tgt}[/green]")
+    asyncio.run(_run_async())

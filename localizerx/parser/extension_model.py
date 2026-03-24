@@ -137,6 +137,7 @@ class ExtensionCatalog(BaseModel):
         self,
         target_locale: str,
         keys_filter: list[str] | None = None,
+        overwrite: bool = False,
     ) -> list[ExtensionMessage]:
         """Get source messages that need translation for a target locale.
 
@@ -155,6 +156,11 @@ class ExtensionCatalog(BaseModel):
             src_msg = source.get_message(key)
             if not src_msg or not src_msg.message.strip():
                 continue
+            
+            if overwrite:
+                needs_translation.append(src_msg)
+                continue
+                
             if target is None or target.get_message(key) is None:
                 needs_translation.append(src_msg)
             elif target.get_message(key).message.strip() == "":

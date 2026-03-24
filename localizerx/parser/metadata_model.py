@@ -155,7 +155,10 @@ class MetadataCatalog(BaseModel):
         return [loc for loc in self.locales if loc != self.source_locale]
 
     def get_fields_needing_translation(
-        self, target_locale: str, field_types: list[MetadataFieldType] | None = None
+        self,
+        target_locale: str,
+        field_types: list[MetadataFieldType] | None = None,
+        overwrite: bool = False,
     ) -> list[MetadataFieldType]:
         """Get field types that need translation for a target locale."""
         source = self.get_source_metadata()
@@ -170,6 +173,11 @@ class MetadataCatalog(BaseModel):
             # Source must have the field
             if not source.has_field(field_type):
                 continue
+            
+            if overwrite:
+                needs_translation.append(field_type)
+                continue
+                
             # Target must not have the field or be empty
             if target is None or not target.has_field(field_type):
                 needs_translation.append(field_type)

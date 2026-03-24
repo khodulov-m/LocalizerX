@@ -13,6 +13,13 @@ from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
+from localizerx.adapters.repository import I18nCatalogRepository
+from localizerx.core.use_cases.translate_i18n import (
+    I18nTranslationPreview,
+    I18nTranslationTask,
+    TranslateI18nRequest,
+    TranslateI18nUseCase,
+)
 from localizerx.utils.locale import (
     get_language_name,
     parse_language_list,
@@ -204,12 +211,7 @@ def _run_i18n_translate(
     remove: str | None = None,
 ) -> None:
     """Core i18n translation logic."""
-    from localizerx.io.i18n import (
-        delete_i18n_locale,
-        detect_i18n_path,
-        read_i18n,
-        update_index_ts,
-    )
+    from localizerx.io.i18n import detect_i18n_path
 
     config = load_config()
 
@@ -228,50 +230,16 @@ def _run_i18n_translate(
         console.print(f"[red]Error:[/red] Path does not exist: {path}")
         raise typer.Exit(1)
 
-    # Handle removal first
-    actually_removed = []
-    if remove_locales:
-        for loc in remove_locales:
-            if loc == src:
-                console.print(f"[yellow]Skipping source locale removal:[/yellow] {loc}")
-                continue
-
-            if dry_run:
-                actually_removed.append(loc)
-                continue
-
-            if delete_i18n_locale(path, loc):
-                actually_removed.append(loc)
-
-        if actually_removed:
-            status = "Would remove" if dry_run else "Removed"
-            console.print(
-                f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] "
-                f"{', '.join(actually_removed)}"
-            )
-
-        if not target_locales:
-            if dry_run:
-                console.print("\n[yellow]Dry run - no changes made[/yellow]")
-                return
-            if actually_removed and update_index:
-                # Update index.ts after removal
-                catalog = read_i18n(path, source_locale=src)
-                update_index_ts(path, catalog)
-                console.print(f"[green]Updated {path}/index.ts[/green]")
-            return
-
-    try:
-        catalog = read_i18n(path, source_locale=src)
-    except (FileNotFoundError, ValueError) as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
-
-    source = catalog.get_source_locale()
-    if not source:
-        console.print(f"[red]Error:[/red] Source locale '{src}' not found")
-        console.print(f"Available locales: {', '.join(catalog.locales.keys())}")
-        raise typer.Exit(1)
+    repository = I18nCatalogRepository()
+    
+    cache_dir = get_cache_dir(config)
+    actual_batch_size = batch_size or config.i18n.batch_size
+    actual_model = model or config.i18n.model
+    
+    thinking_level = getattr(config.i18n, "thinking_level", "0")
+    thinking_config = (
+        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    )
 
     console.print(f"[bold]Locales Directory:[/bold] {path}")
     console.print(f"[bold]Source:[/bold] {get_language_name(src)} ({src})")
@@ -280,161 +248,120 @@ def _run_i18n_translate(
         console.print(f"[bold]Targets:[/bold] {target_display}")
     console.print()
 
-    # Determine messages to translate per locale
-    translation_tasks: dict[str, list] = {}
-
-    for target_locale in target_locales:
-        if overwrite:
-            needs = [m for m in source.messages.values() if m.needs_translation]
-        else:
-            needs = catalog.get_messages_needing_translation(target_locale)
-
-        if needs:
-            translation_tasks[target_locale] = needs
-
-    if not translation_tasks:
-        console.print("[green]All messages already translated[/green]")
-        if update_index:
-            update_index_ts(path, catalog)
-            console.print(f"[green]Updated {path}/index.ts[/green]")
-        return
-
-    for locale, msgs in translation_tasks.items():
-        console.print(f"  {get_language_name(locale)}: {len(msgs)} message(s) to translate")
-
-    if dry_run:
-        console.print("\n[yellow]Dry run - no changes made[/yellow]")
-        _show_i18n_dry_run(translation_tasks)
-        return
-
-    asyncio.run(
-        _translate_i18n(
-            catalog=catalog,
-            path=path,
-            source_locale=src,
-            translation_tasks=translation_tasks,
-            config=config,
-            preview=preview,
-            backup=backup,
-            batch_size=batch_size,
-            model=model,
-            update_index=update_index,
+    # Callbacks
+    def on_remove(locales: list[str]):
+        status = "Would remove" if dry_run else "Removed"
+        console.print(
+            f"[yellow]{status} {len(locales)} locale(s):[/yellow] "
+            f"{', '.join(locales)}"
         )
-    )
+
+    def on_task_summary(tasks: dict[str, I18nTranslationTask]):
+        for locale, task in tasks.items():
+            console.print(f"  {get_language_name(locale)}: {len(task.messages)} message(s) to translate")
+            
+        if dry_run:
+            console.print("\n[yellow]Dry run - no changes made[/yellow]")
+            _show_i18n_dry_run_from_tasks(tasks)
+
+    progress = None
+    
+    def on_translation_start(locale: str, total: int):
+        nonlocal progress
+        if not progress:
+            progress = create_progress()
+            progress.start()
+        console.print(f"  Translating to {get_language_name(locale)}...")
+        return progress.add_task(f"    {locale}", total=total)
+
+    def on_translation_progress(task_id, advance_by):
+        if progress:
+            progress.advance(task_id, advance_by)
+
+    def on_preview_request(items: list[I18nTranslationPreview]) -> bool:
+        if progress:
+            progress.stop()
+        table = Table(title="Translation Preview")
+        table.add_column("Locale", style="cyan")
+        table.add_column("Key", style="white")
+        table.add_column("Translation", style="green")
+        
+        for i, item in enumerate(items):
+            if i >= 20:
+                break
+            preview_value = item.translation[:60] + "..." if len(item.translation) > 60 else item.translation
+            table.add_row(item.locale, item.key[:30], preview_value)
+            
+        if len(items) > 20:
+            table.add_row("...", "", f"({len(items) - 20} more)")
+            
+        console.print(table)
+        apply = typer.confirm("Apply these translations?")
+        if not apply:
+            console.print("  [yellow]Cancelled[/yellow]")
+        return apply
+
+    async def _run_async():
+        async with GeminiTranslator(
+            thinking_config=thinking_config,
+            model=actual_model,
+            batch_size=actual_batch_size,
+            max_retries=config.i18n.max_retries,
+            cache_dir=cache_dir,
+        ) as translator:
+            
+            use_case = TranslateI18nUseCase(repository=repository, translator=translator)
+            request = TranslateI18nRequest(
+                path=path,
+                source_locale=src,
+                target_locales=target_locales,
+                remove_locales=remove_locales,
+                dry_run=dry_run,
+                preview=preview,
+                overwrite=overwrite,
+                backup=backup,
+                update_index=update_index,
+            )
+            
+            try:
+                result = await use_case.execute(
+                    request=request,
+                    on_remove=on_remove,
+                    on_task_summary=on_task_summary,
+                    on_translation_start=on_translation_start,
+                    on_translation_progress=on_translation_progress,
+                    on_preview_request=on_preview_request,
+                )
+                
+                if result.saved:
+                    console.print(f"\n[green]Saved translations to {path}[/green]")
+                    if update_index:
+                         console.print(f"[green]Updated {path}/index.ts[/green]")
+                elif not result.tasks and not result.removed_locales and not dry_run:
+                     console.print("[green]All messages already translated[/green]")
+                     if update_index:
+                          console.print(f"[green]Updated {path}/index.ts[/green]")
+                     
+            finally:
+                if progress:
+                    progress.stop()
+
+    asyncio.run(_run_async())
 
 
-def _show_i18n_dry_run(tasks: dict[str, list]) -> None:
+def _show_i18n_dry_run_from_tasks(tasks: dict[str, I18nTranslationTask]) -> None:
     """Show table of messages that would be translated."""
     table = Table(title="Messages to Translate")
     table.add_column("Locale", style="cyan")
     table.add_column("Key", style="white")
     table.add_column("Value", style="green")
 
-    for locale, msgs in tasks.items():
-        for msg in msgs[:20]:
+    for locale, task in tasks.items():
+        for msg in task.messages[:20]:
             display_value = msg.value[:50] + "..." if len(msg.value) > 50 else msg.value
             table.add_row(locale, msg.key[:40], display_value)
 
-        if len(msgs) > 20:
-            table.add_row(locale, f"... ({len(msgs) - 20} more)", "")
-
-    console.print(table)
-
-
-async def _translate_i18n(
-    catalog,
-    path: Path,
-    source_locale: str,
-    translation_tasks: dict[str, list],
-    config,
-    preview: bool,
-    backup: bool,
-    batch_size: int | None,
-    model: str | None,
-    update_index: bool = True,
-) -> None:
-    """Perform i18n translations and update catalog."""
-    from localizerx.io.i18n import write_i18n
-
-    cache_dir = get_cache_dir(config)
-    actual_batch_size = batch_size or config.i18n.batch_size
-    actual_model = model or config.i18n.model
-
-    thinking_level = getattr(config.i18n, "thinking_level", "0")
-    thinking_config = (
-        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
-    )
-
-    async with GeminiTranslator(
-        thinking_config=thinking_config,
-        model=actual_model,
-        batch_size=actual_batch_size,
-        max_retries=config.i18n.max_retries,
-        cache_dir=cache_dir,
-    ) as translator:
-        all_translations: dict[str, dict[str, str]] = {}  # locale -> {key: translated}
-
-        for target_locale, messages in translation_tasks.items():
-            console.print(f"  Translating to {get_language_name(target_locale)}...")
-            all_translations[target_locale] = {}
-
-            requests = [TranslationRequest(key=m.key, text=m.value) for m in messages]
-
-            with create_progress() as progress:
-                task = progress.add_task(f"    {target_locale}", total=len(requests))
-
-                results = await translator.translate_batch(requests, source_locale, target_locale)
-
-                for result in results:
-                    if result.success and result.translated:
-                        all_translations[target_locale][result.key] = result.translated
-                    progress.advance(task)
-
-        # Show preview if requested
-        if preview:
-            _show_i18n_preview(all_translations)
-            if not typer.confirm("Apply these translations?"):
-                console.print("  [yellow]Cancelled[/yellow]")
-                return
-
-        # Update catalog
-        for target_locale, translations in all_translations.items():
-            locale_data = catalog.get_or_create_locale(target_locale)
-            for key, translated_text in translations.items():
-                locale_data.set_message(key, translated_text)
-
-        # Write files
-        write_i18n(
-            catalog,
-            path,
-            backup=backup,
-            locales=list(all_translations.keys()),
-            update_index=update_index,
-        )
-
-        console.print(f"\n[green]Saved translations to {path}[/green]")
-
-
-def _show_i18n_preview(all_translations: dict) -> None:
-    """Show preview of i18n translations."""
-    table = Table(title="Translation Preview")
-    table.add_column("Locale", style="cyan")
-    table.add_column("Key", style="white")
-    table.add_column("Translation", style="green")
-
-    count = 0
-    for locale, translations in all_translations.items():
-        for key, value in translations.items():
-            preview_value = value[:60] + "..." if len(value) > 60 else value
-            table.add_row(locale, key[:30], preview_value)
-            count += 1
-            if count >= 20:
-                break
-        if count >= 20:
-            break
-
-    total = sum(len(t) for t in all_translations.values())
-    if total > 20:
-        table.add_row("...", "", f"({total - 20} more)")
+        if len(task.messages) > 20:
+            table.add_row(locale, f"... ({len(task.messages) - 20} more)", "")
 
     console.print(table)
