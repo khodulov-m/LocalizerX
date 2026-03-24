@@ -40,7 +40,7 @@ def test_translate_refresh_removes_stale_and_ignores_translated(tmp_path: Path):
         app, ["translate", str(file_path), "--to", "fr", "--refresh", "--dry-run"]
     )
     assert result.exit_code == 0
-    assert "Removed 1 stale string(s)" in result.stdout
+    assert "Would remove 1 stale string(s)" in result.stdout
     assert "Dry run - no changes made" in result.stdout
 
     # Check dry run output
