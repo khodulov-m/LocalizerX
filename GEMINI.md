@@ -63,12 +63,16 @@ pytest tests/test_file.py::test_function
 
 ## Architecture Map
 
-- **`localizerx/cli/`**: Typer-based CLI command definitions (`translate.py`, `metadata.py`, `android.py`, `frameit.py`, etc.).
-- **`localizerx/config.py`**: Configuration management using TOML (stored in `~/.config/localizerx/config.toml`).
-- **`localizerx/io/`**: I/O handlers for various formats (e.g., `xcstrings.py`, `android.py`, `extension.py`, `frameit.py`). Ensures lossless parsing.
-- **`localizerx/parser/`**: Pydantic data models for entries, translations, and specific app contexts (`model.py`, `metadata_model.py`, `frameit_model.py`, etc.).
-- **`localizerx/translator/`**: Core translation logic. Contains the `gemini_adapter.py` for API interaction and domain-specific prompt templates (`extension_prompts.py`, `screenshots_prompts.py`, `frameit_prompts.py`).
-- **`localizerx/utils/`**: Utilities for placeholder masking (`placeholders.py`), locale mapping (`locale.py`), and character limit enforcement (`limits.py`).
+- **`localizerx/core/`**: Core business logic and application layer.
+  - **`use_cases/`**: Orchestration logic (e.g., `translate_xcstrings.py`). Framework-agnostic.
+  - **`ports/`**: Abstract interfaces (e.g., `repository.py`) for external services.
+- **`localizerx/adapters/`**: Implementations of ports (e.g., `repository.py` for file I/O).
+- **`localizerx/cli/`**: Typer-based delivery layer. Parses arguments and invokes use cases.
+- **`localizerx/parser/`**: Domain entities and Pydantic data models (`model.py`, `android_model.py`, etc.).
+- **`localizerx/io/`**: Low-level I/O handlers for various formats.
+- **`localizerx/translator/`**: External API adapters and prompt templates.
+- **`localizerx/config.py`**: Configuration management using TOML.
+- **`localizerx/utils/`**: Utilities for placeholder masking, locale mapping, etc.
 - **`tests/`**: Comprehensive test suite organized by module and functionality.
 
 ## Usage Environment Variables

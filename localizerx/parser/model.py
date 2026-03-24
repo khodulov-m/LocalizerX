@@ -97,16 +97,60 @@ class StringCatalog(BaseModel):
         """Get the formatting to use when writing back."""
         return getattr(self, "_indent", 2), getattr(self, "_separators", (",", ": "))
 
-    def get_entries_needing_translation(self, target_lang: str) -> list[Entry]:
+    def get_entries_needing_translation(self, target_lang: str, overwrite: bool = False, refresh: bool = False) -> list[Entry]:
         """Get entries that need translation for a target language."""
         entries = []
         for entry in self.strings.values():
             if not entry.needs_translation:
                 continue
-            if target_lang not in entry.translations:
+                
+            # In refresh mode, only target "new" strings
+            if refresh and entry.extraction_state != "new":
+                continue
+                
+            if target_lang not in entry.translations or overwrite:
                 entries.append(entry)
         return entries
 
     def get_all_translatable_entries(self) -> list[Entry]:
         """Get all entries that can be translated."""
         return [e for e in self.strings.values() if e.needs_translation]
+
+    def refresh(self) -> list[str]:
+        """Remove stale entries from the catalog. Returns the list of removed keys."""
+        stale_keys = [
+            key for key, entry in self.strings.items() if entry.extraction_state == "stale"
+        ]
+        for key in stale_keys:
+            del self.strings[key]
+        return stale_keys
+
+    def mark_empty_as_translated(self, target_langs: list[str], overwrite: bool = False) -> int:
+        """
+        Mark empty or whitespace strings as translated for specified target languages.
+        Returns the number of strings marked.
+        """
+        marked_count = 0
+        for target_lang in target_langs:
+            for entry in self.strings.values():
+                # Check if source text is empty or whitespace and has no variations
+                if not entry.source_text.strip() and not entry.source_variations:
+                    if target_lang not in entry.translations or overwrite:
+                        entry.translations[target_lang] = Translation(
+                            value=entry.source_text, state="translated"
+                        )
+                        marked_count += 1
+        return marked_count
+
+    def remove_languages(self, langs: list[str]) -> list[str]:
+        """Remove translations for specified languages. Returns languages actually removed."""
+        removed_langs = []
+        for lang in langs:
+            removed = False
+            for entry in self.strings.values():
+                if lang in entry.translations:
+                    del entry.translations[lang]
+                    removed = True
+            if removed:
+                removed_langs.append(lang)
+        return removed_langs

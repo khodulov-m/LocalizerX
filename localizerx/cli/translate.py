@@ -26,6 +26,13 @@ from localizerx.utils.locale import (
     parse_language_list,
     validate_language_code,
 )
+from localizerx.adapters.repository import XCStringsRepository
+from localizerx.core.use_cases.translate_xcstrings import (
+    TranslateCatalogRequest,
+    TranslateCatalogUseCase,
+    TranslationPreview,
+    TranslationTask,
+)
 
 
 def translate(
@@ -381,162 +388,8 @@ def _process_file(
     """Process a single xcstrings file."""
     console.print(f"[bold]Processing:[/bold] {file_path}")
 
-    # Read file
-    catalog = read_xcstrings(file_path)
-    console.print(f"  Found {len(catalog.strings)} string(s)")
+    repository = XCStringsRepository()
 
-    # Mark empty strings if requested
-    marked_count = 0
-    if mark_empty:
-        for target_lang in target_langs:
-            for entry in catalog.strings.values():
-                # Check if source text is empty or whitespace and has no variations
-                if not entry.source_text.strip() and not entry.source_variations:
-                    if target_lang not in entry.translations or overwrite:
-                        if not dry_run:
-                            entry.translations[target_lang] = Translation(
-                                value=entry.source_text, state="translated"
-                            )
-                        marked_count += 1
-
-        if marked_count > 0:
-            msg = "Marked" if not dry_run else "Would mark"
-            console.print(
-                f"  [green]{msg} {marked_count} empty/whitespace string(s) as translated[/green]"
-            )
-
-    # Remove languages if requested
-    languages_actually_removed = []
-    if remove_langs:
-        for lang in remove_langs:
-            removed_from_any = False
-            for entry in catalog.strings.values():
-                if lang in entry.translations:
-                    del entry.translations[lang]
-                    removed_from_any = True
-            if removed_from_any:
-                languages_actually_removed.append(lang)
-
-        if languages_actually_removed:
-            console.print(
-                f"  [yellow]Removed {len(languages_actually_removed)} language(s)[/yellow]"
-            )
-
-    # Collect entries to translate per language
-    translation_tasks: dict[str, list[tuple[str, str, str | None, dict | None]]] = {}
-
-    stale_keys = []
-    if refresh:
-        for key, entry in catalog.strings.items():
-            if entry.extraction_state == "stale":
-                stale_keys.append(key)
-
-        for key in stale_keys:
-            del catalog.strings[key]
-
-        if stale_keys:
-            console.print(f"  [yellow]Removed {len(stale_keys)} stale string(s)[/yellow]")
-
-    for target_lang in target_langs:
-        entries_to_translate = []
-        for key, entry in catalog.strings.items():
-            if not entry.needs_translation:
-                continue
-
-            # In refresh mode, only target "new" strings
-            if refresh and entry.extraction_state != "new":
-                continue
-
-            # Skip if translation exists and not overwriting
-            if target_lang in entry.translations and not overwrite:
-                continue
-
-            entries_to_translate.append(
-                (key, entry.source_text, entry.comment, entry.source_variations)
-            )
-
-        if entries_to_translate:
-            translation_tasks[target_lang] = entries_to_translate
-
-    if not translation_tasks:
-        if (refresh and stale_keys) or languages_actually_removed or marked_count > 0:
-            if dry_run:
-                console.print("  [yellow]Dry run - no changes made[/yellow]")
-                return
-            write_xcstrings(catalog, file_path, backup=backup)
-            console.print(f"  [green]Saved {file_path}[/green]")
-        else:
-            console.print("  [green]All strings already translated[/green]")
-        return
-
-    # Show summary
-    for lang, entries in translation_tasks.items():
-        console.print(f"  {get_language_name(lang)}: {len(entries)} string(s) to translate")
-
-    if dry_run:
-        console.print("  [yellow]Dry run - no changes made[/yellow]")
-        _show_dry_run_table(translation_tasks)
-        return
-
-    # Perform translation
-    asyncio.run(
-        _translate_file(
-            catalog=catalog,
-            file_path=file_path,
-            source_lang=source_lang,
-            translation_tasks=translation_tasks,
-            config=config,
-            preview=preview,
-            backup=backup,
-            batch_size=batch_size,
-            model=model,
-            temperature=temperature,
-            custom_prompt=custom_prompt,
-            no_app_context=no_app_context,
-        )
-    )
-
-
-def _show_dry_run_table(tasks: dict[str, list[tuple[str, str, str | None, dict | None]]]) -> None:
-    """Show table of strings that would be translated."""
-    table = Table(title="Strings to Translate")
-    table.add_column("Key", style="cyan")
-    table.add_column("Source Text", style="white")
-    table.add_column("Languages", style="green")
-
-    # Collect all unique entries
-    entries: dict[str, tuple[str, set[str]]] = {}
-    for lang, items in tasks.items():
-        for key, text, _, _ in items:
-            if key not in entries:
-                entries[key] = (text, set())
-            entries[key][1].add(lang)
-
-    for key, (text, langs) in list(entries.items())[:20]:
-        display_text = text[:50] + "..." if len(text) > 50 else text
-        table.add_row(key[:40], display_text, ", ".join(sorted(langs)))
-
-    if len(entries) > 20:
-        table.add_row("...", f"({len(entries) - 20} more)", "")
-
-    console.print(table)
-
-
-async def _translate_file(
-    catalog,
-    file_path: Path,
-    source_lang: str,
-    translation_tasks: dict[str, list[tuple[str, str, str | None, dict | None]]],
-    config: Config,
-    preview: bool,
-    backup: bool,
-    batch_size: int | None,
-    model: str | None,
-    temperature: float | None,
-    custom_prompt: str | None,
-    no_app_context: bool,
-) -> None:
-    """Perform translations and update catalog."""
     cache_dir = get_cache_dir(config)
     actual_batch_size = batch_size or config.translate.batch_size
     actual_model = model or config.translate.model
@@ -554,116 +407,140 @@ async def _translate_file(
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
     )
 
-    async with GeminiTranslator(
-        thinking_config=thinking_config,
-        model=actual_model,
-        batch_size=actual_batch_size,
-        max_retries=config.translate.max_retries,
-        cache_dir=cache_dir,
-        temperature=actual_temperature,
-        custom_instructions=actual_custom_instructions,
-        app_context=app_context,
-    ) as translator:
-        all_translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]] = (
-            {}
-        )  # key -> {lang: (translation, plural_forms)}
+    # Callbacks for UI
+    def on_read(total: int):
+        console.print(f"  Found {total} string(s)")
 
-        for target_lang, entries in translation_tasks.items():
-            console.print(f"  Translating to {get_language_name(target_lang)}...")
+    def on_task_summary(tasks: list[TranslationTask]):
+        for task in tasks:
+            console.print(f"  {get_language_name(task.lang)}: {len(task.requests)} string(s) to translate")
+        if dry_run:
+            console.print("  [yellow]Dry run - no changes made[/yellow]")
+            _show_dry_run_table(tasks)
 
-            requests = []
-            for key, text, comment, source_variations in entries:
-                # Extract plural forms if present
-                plural_forms = None
-                if source_variations and "plural" in source_variations:
-                    plural_forms = {}
-                    for form_name, form_data in source_variations["plural"].items():
-                        if "stringUnit" in form_data:
-                            plural_forms[form_name] = form_data["stringUnit"].get("value", "")
+    progress = None
+    progress_tasks = {}
 
-                requests.append(
-                    TranslationRequest(
-                        key=key, text=text, comment=comment, plural_forms=plural_forms
-                    )
-                )
+    def on_translation_start(lang: str, total: int):
+        nonlocal progress
+        if not progress:
+            progress = create_progress()
+            progress.start()
+        console.print(f"  Translating to {get_language_name(lang)}...")
+        task_id = progress.add_task(f"    {lang}", total=total)
+        progress_tasks[lang] = task_id
+        return task_id
 
-            with create_progress() as progress:
-                task = progress.add_task(f"    {target_lang}", total=len(requests))
+    def on_translation_progress(task_id, advance_by):
+        if progress:
+            progress.advance(task_id, advance_by)
 
-                results = await translator.translate_batch(requests, source_lang, target_lang)
-
-                for result in results:
-                    if result.success:
-                        if result.key not in all_translations:
-                            all_translations[result.key] = {}
-                        all_translations[result.key][target_lang] = (
-                            result.translated,
-                            result.translated_plurals,
-                        )
-                    progress.advance(task)
-
-        # Show preview if requested
-        if preview:
-            _show_preview_table(all_translations, catalog)
-            if not typer.confirm("Apply these translations?"):
-                console.print("  [yellow]Cancelled[/yellow]")
-                return
-
-        # Update catalog
-        for key, translations in all_translations.items():
-            if key in catalog.strings:
-                for lang, (value, translated_plurals) in translations.items():
-                    # Build variations structure if we have plural translations
-                    variations = None
-                    if translated_plurals:
-                        variations = {"plural": {}}
-                        for form_name, form_value in translated_plurals.items():
-                            variations["plural"][form_name] = {
-                                "stringUnit": {"state": "translated", "value": form_value}
-                            }
-
-                    catalog.strings[key].translations[lang] = Translation(
-                        value=value, variations=variations
-                    )
-
-        # Write file
-        write_xcstrings(catalog, file_path, backup=backup)
-        console.print(f"  [green]Saved {file_path}[/green]")
-
-
-def _show_preview_table(
-    translations: dict[str, dict[str, tuple[str, dict[str, str] | None]]], catalog
-) -> None:
-    """Show preview of translations."""
-    table = Table(title="Translation Preview")
-    table.add_column("Key", style="cyan")
-    table.add_column("Source", style="white")
-    table.add_column("Language", style="yellow")
-    table.add_column("Translation", style="green")
-
-    count = 0
-    for key, lang_translations in translations.items():
-        source = catalog.strings[key].source_text if key in catalog.strings else ""
-        source_display = source[:30] + "..." if len(source) > 30 else source
-
-        for lang, (trans, plurals) in lang_translations.items():
-            if plurals:
-                # Show plural forms preview
-                plural_preview = ", ".join(
-                    f"{k}: {v[:20]}..." if len(v) > 20 else f"{k}: {v}" for k, v in plurals.items()
-                )
-                trans_display = f"[plurals: {plural_preview[:40]}...]"
-            else:
-                trans_display = trans[:40] + "..." if len(trans) > 40 else trans
-            table.add_row(key[:25], source_display, lang, trans_display)
-            count += 1
-            if count >= 30:
+    def on_preview_request(items: list[TranslationPreview]) -> bool:
+        if progress:
+            progress.stop()
+        table = Table(title="Translation Preview")
+        table.add_column("Key", style="cyan")
+        table.add_column("Source", style="white")
+        table.add_column("Language", style="yellow")
+        table.add_column("Translation", style="green")
+        
+        for i, item in enumerate(items):
+            if i >= 30:
                 break
-        if count >= 30:
-            break
+            source_display = item.source[:30] + "..." if len(item.source) > 30 else item.source
+            table.add_row(item.key[:25], source_display, item.lang, item.translation)
+            
+        if len(items) > 30:
+            table.add_row("...", "", "", f"({len(items) - 30} more)")
+            
+        console.print(table)
+        apply = typer.confirm("Apply these translations?")
+        if not apply:
+            console.print("  [yellow]Cancelled[/yellow]")
+        return apply
 
-    if len(translations) > 30:
-        table.add_row("...", "", "", f"({sum(len(t) for t in translations.values()) - 30} more)")
+    async def _run_async():
+        async with GeminiTranslator(
+            thinking_config=thinking_config,
+            model=actual_model,
+            batch_size=actual_batch_size,
+            max_retries=config.translate.max_retries,
+            cache_dir=cache_dir,
+            temperature=actual_temperature,
+            custom_instructions=actual_custom_instructions,
+            app_context=app_context,
+        ) as translator:
+            
+            use_case = TranslateCatalogUseCase(repository=repository, translator=translator)
+            request = TranslateCatalogRequest(
+                file_path=file_path,
+                source_lang=source_lang,
+                target_langs=target_langs,
+                remove_langs=remove_langs,
+                dry_run=dry_run,
+                preview=preview,
+                overwrite=overwrite,
+                backup=backup,
+                mark_empty=mark_empty,
+                refresh=refresh,
+            )
+            
+            try:
+                result = await use_case.execute(
+                    request=request,
+                    on_read=on_read,
+                    on_task_summary=on_task_summary,
+                    on_translation_start=on_translation_start,
+                    on_translation_progress=on_translation_progress,
+                    on_preview_request=on_preview_request,
+                )
+            finally:
+                if progress:
+                    progress.stop()
+            
+            # Print legacy summary lines
+            if result.marked_empty_count > 0:
+                msg = "Would mark" if dry_run else "Marked"
+                console.print(f"  [green]{msg} {result.marked_empty_count} empty/whitespace string(s) as translated[/green]")
+            if result.removed_languages:
+                status = "Would remove" if dry_run else "Removed"
+                console.print(f"  [yellow]{status} {len(result.removed_languages)} language(s)[/yellow]")
+            if result.stale_keys_removed > 0:
+                status = "Would remove" if dry_run else "Removed"
+                console.print(f"  [yellow]{status} {result.stale_keys_removed} stale string(s)[/yellow]")
+
+            if not result.tasks:
+                if result.saved:
+                    console.print(f"  [green]Saved {file_path}[/green]")
+                elif not dry_run and not result.removed_languages and result.marked_empty_count == 0 and result.stale_keys_removed == 0:
+                    console.print("  [green]All strings already translated[/green]")
+            elif result.saved:
+                console.print(f"  [green]Saved {file_path}[/green]")
+
+    asyncio.run(_run_async())
+
+
+def _show_dry_run_table(tasks: list[TranslationTask]) -> None:
+    """Show table of strings that would be translated."""
+    table = Table(title="Strings to Translate")
+    table.add_column("Key", style="cyan")
+    table.add_column("Source Text", style="white")
+    table.add_column("Languages", style="green")
+
+    # Collect all unique entries
+    entries: dict[str, tuple[str, set[str]]] = {}
+    for task in tasks:
+        for req in task.requests:
+            if req.key not in entries:
+                entries[req.key] = (req.text, set())
+            entries[req.key][1].add(task.lang)
+
+    for key, (text, langs) in list(entries.items())[:20]:
+        display_text = text[:50] + "..." if len(text) > 50 else text
+        table.add_row(key[:40], display_text, ", ".join(sorted(langs)))
+
+    if len(entries) > 20:
+        table.add_row("...", f"({len(entries) - 20} more)", "")
 
     console.print(table)
 
