@@ -12,6 +12,13 @@ from rich.table import Table
 from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.gemini_adapter import GeminiTranslator
+from localizerx.adapters.repository import ScreenshotsCatalogRepository
+from localizerx.core.use_cases.translate_screenshots import (
+    ScreenshotsTranslationPreview,
+    ScreenshotsTranslationTask,
+    TranslateScreenshotsRequest,
+    TranslateScreenshotsUseCase,
+)
 from localizerx.utils.locale import (
     get_language_name,
     parse_language_list,
@@ -714,7 +721,6 @@ def _run_screenshots_translate(
         create_screenshots_template,
         detect_screenshots_path,
         get_default_screenshots_path,
-        read_screenshots,
     )
 
     config = load_config()
@@ -736,25 +742,24 @@ def _run_screenshots_translate(
         console.print("  localizerx screenshots --to de,fr,es")
         return
 
-    # File exists, translate it
+    repository = ScreenshotsCatalogRepository()
+    
+    # Read catalog early to determine source language if not provided
     try:
-        catalog = read_screenshots(path)
+        catalog = repository.read(path)
     except (FileNotFoundError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
 
-    # Determine source language
     source_lang = src if src else catalog.source_language
 
-    # Parse target languages (use config defaults if not specified)
+    # Parse target languages
     if to:
         target_langs = parse_language_list(to)
     else:
         target_langs = config.default_targets.copy()
         if target_langs:
-            console.print(
-                f"[dim]Using default targets from config ({len(target_langs)} languages)[/dim]"
-            )
+            console.print(f"[dim]Using default targets from config ({len(target_langs)} languages)[/dim]")
 
     if not target_langs:
         console.print("[red]Error:[/red] No target languages specified")
@@ -773,47 +778,100 @@ def _run_screenshots_translate(
     console.print(f"[bold]Targets:[/bold] {target_display}")
     console.print()
 
-    # Determine texts to translate per language
+    # Callbacks
+    def on_task_summary(tasks: dict[str, ScreenshotsTranslationTask]):
+        for lang, task in tasks.items():
+            console.print(f"  {get_language_name(lang)}: {len(task.items)} text(s) to translate")
+            
+        if dry_run:
+            console.print("\n[yellow]Dry run - no changes made[/yellow]")
+            _show_screenshots_dry_run_from_tasks(catalog, tasks)
 
-    translation_tasks: dict[str, list] = {}  # lang -> [(screen_id, text_type, device_class)]
+    progress = None
+    
+    def on_translation_start(lang: str, total: int):
+        nonlocal progress
+        if not progress:
+            progress = create_progress()
+            progress.start()
+        console.print(f"  Translating to {get_language_name(lang)}...")
+        return progress.add_task(f"    {lang}", total=total)
 
-    for target_lang in target_langs:
-        needs = catalog.get_texts_needing_translation(target_lang, overwrite=overwrite)
-        if needs:
-            translation_tasks[target_lang] = needs
+    def on_translation_progress(task_id, advance_by):
+        if progress:
+            progress.advance(task_id, advance_by)
 
-    if not translation_tasks:
-        console.print("[green]All texts already translated[/green]")
-        return
+    def on_preview_request(items: list[ScreenshotsTranslationPreview]) -> bool:
+        if progress:
+            progress.stop()
+        table = Table(title="Translation Preview")
+        table.add_column("Language", style="cyan")
+        table.add_column("Screen", style="white")
+        table.add_column("Type", style="yellow")
+        table.add_column("Translation", style="green")
+        
+        for i, item in enumerate(items):
+            if i >= 20:
+                break
+            preview_value = item.translation[:60] + "..." if len(item.translation) > 60 else item.translation
+            table.add_row(item.locale, item.screen_id, f"{item.text_type}/{item.device_class}", preview_value)
+            
+        if len(items) > 20:
+            table.add_row("...", "", "", f"({len(items) - 20} more)")
+            
+        console.print(table)
+        apply = typer.confirm("Apply these translations?")
+        if not apply:
+            console.print("  [yellow]Cancelled[/yellow]")
+        return apply
 
-    # Show summary
-    for lang, texts in translation_tasks.items():
-        console.print(f"  {get_language_name(lang)}: {len(texts)} text(s) to translate")
+    async def _run_async():
+        ss_cfg = config.screenshots
+        cache_dir = get_cache_dir(config)
+        actual_model = model or ss_cfg.model
+        thinking_config = {"thinkingLevel": ss_cfg.thinking_level}
 
-    if dry_run:
-        console.print("\n[yellow]Dry run - no changes made[/yellow]")
-        _show_screenshots_dry_run(catalog, translation_tasks)
-        return
+        async with GeminiTranslator(
+            thinking_config=thinking_config,
+            model=actual_model,
+            max_retries=config.translator.max_retries,
+            cache_dir=cache_dir,
+            temperature=ss_cfg.temperature,
+        ) as translator:
+            
+            use_case = TranslateScreenshotsUseCase(repository=repository, translator=translator)
+            request = TranslateScreenshotsRequest(
+                path=path,
+                source_lang=source_lang,
+                target_langs=target_langs,
+                dry_run=dry_run,
+                preview=preview,
+                overwrite=overwrite,
+                batch_size=ss_cfg.batch_size,
+            )
+            
+            try:
+                result = await use_case.execute(
+                    request=request,
+                    on_task_summary=on_task_summary,
+                    on_translation_start=on_translation_start,
+                    on_translation_progress=on_translation_progress,
+                    on_preview_request=on_preview_request,
+                )
+                
+                if result.saved:
+                    console.print(f"\n[green]Saved translations to {path}[/green]")
+                elif not result.tasks and not dry_run:
+                     console.print("[green]All texts already translated[/green]")
+                     
+            finally:
+                if progress:
+                    progress.stop()
 
-    # Perform translation
-    asyncio.run(
-        _translate_screenshots(
-            catalog=catalog,
-            path=path,
-            source_lang=source_lang,
-            translation_tasks=translation_tasks,
-            config=config,
-            preview=preview,
-            backup=backup,
-            model=model,
-        )
-    )
+    asyncio.run(_run_async())
 
 
-def _show_screenshots_dry_run(
-    catalog,
-    tasks: dict[str, list],
-) -> None:
+def _show_screenshots_dry_run_from_tasks(catalog, tasks: dict[str, ScreenshotsTranslationTask]) -> None:
     """Show table of texts that would be translated."""
     from localizerx.parser.screenshots_model import SCREENSHOT_TEXT_WORD_LIMIT
 
@@ -824,8 +882,8 @@ def _show_screenshots_dry_run(
     table.add_column("Device", style="blue")
     table.add_column("Words", style="green")
 
-    for lang, items in tasks.items():
-        for screen_id, text_type, device_class in items[:20]:
+    for lang, task in tasks.items():
+        for screen_id, text_type, device_class in task.items[:20]:
             screen = catalog.screens.get(screen_id)
             if screen:
                 text = screen.get_text(text_type)
@@ -834,172 +892,9 @@ def _show_screenshots_dry_run(
                     words_str = str(word_count)
                     if word_count > SCREENSHOT_TEXT_WORD_LIMIT:
                         words_str = f"[red]{word_count}[/red]"
-                    table.add_row(
-                        lang,
-                        screen_id,
-                        text_type.value,
-                        device_class.value,
-                        words_str,
-                    )
+                    table.add_row(lang, screen_id, text_type.value, device_class.value, words_str)
 
-        if len(items) > 20:
-            table.add_row(lang, f"... ({len(items) - 20} more)", "", "", "")
-
-    console.print(table)
-
-
-async def _translate_screenshots(
-    catalog,
-    path: Path,
-    source_lang: str,
-    translation_tasks: dict[str, list],
-    config,
-    preview: bool,
-    backup: bool,
-    model: str | None,
-) -> None:
-    """Perform screenshot text translations and update file."""
-    from localizerx.io.screenshots import write_screenshots
-    from localizerx.parser.screenshots_model import DeviceClass, ScreenshotTextType
-    from localizerx.translator.screenshots_prompts import (
-        build_batch_screenshot_prompt,
-        build_screenshot_prompt,
-        parse_batch_screenshot_response,
-    )
-
-    ss_cfg = config.screenshots
-    cache_dir = get_cache_dir(config)
-    actual_model = model or ss_cfg.model
-    thinking_config = {"thinkingLevel": ss_cfg.thinking_level}
-
-    batch_size = ss_cfg.batch_size
-
-    async with GeminiTranslator(
-        model=actual_model,
-        max_retries=config.translator.max_retries,
-        cache_dir=cache_dir,
-        temperature=ss_cfg.temperature,
-        thinking_config=thinking_config,
-    ) as translator:
-        # {lang: {(screen_id, text_type, device_class): translated_text}}
-        all_translations: dict[str, dict[tuple, str]] = {}
-
-        for target_lang, items in translation_tasks.items():
-            console.print(f"  Translating to {get_language_name(target_lang)}...")
-            all_translations[target_lang] = {}
-
-            # Resolve source texts, filtering out missing screens/variants
-            resolved: list[tuple[str, ScreenshotTextType, DeviceClass, str]] = []
-            for screen_id, text_type, device_class in items:
-                screen = catalog.screens.get(screen_id)
-                if not screen:
-                    continue
-                text_obj = screen.get_text(text_type)
-                if not text_obj:
-                    continue
-                source_text = text_obj.get_variant(device_class)
-                if not source_text:
-                    continue
-                resolved.append((screen_id, text_type, device_class, source_text))
-
-            with create_progress() as progress:
-                task = progress.add_task(f"    {target_lang}", total=len(resolved))
-
-                for batch_start in range(0, len(resolved), batch_size):
-                    batch = resolved[batch_start : batch_start + batch_size]
-
-                    try:
-                        if len(batch) == 1:
-                            screen_id, text_type, device_class, source_text = batch[0]
-                            prompt = build_screenshot_prompt(
-                                text=source_text,
-                                text_type=text_type,
-                                device_class=device_class,
-                                src_lang=source_lang,
-                                tgt_lang=target_lang,
-                            )
-                            response = await translator._call_api(prompt)
-                            translations = [response.strip()]
-                        else:
-                            prompt = build_batch_screenshot_prompt(
-                                items=batch,
-                                src_lang=source_lang,
-                                tgt_lang=target_lang,
-                            )
-                            response = await translator._call_api(prompt)
-                            translations = parse_batch_screenshot_response(response, len(batch))
-
-                        for (screen_id, text_type, device_class, _), translated in zip(
-                            batch, translations
-                        ):
-                            if translated:
-                                all_translations[target_lang][
-                                    (screen_id, text_type, device_class)
-                                ] = translated
-                    except Exception as e:
-                        items_str = ", ".join(f"{sid}/{tt.value}" for sid, tt, _, _ in batch)
-                        console.print(f"    [red]Error translating batch [{items_str}]: {e}[/red]")
-
-                    progress.advance(task, advance=len(batch))
-
-        # Show preview if requested
-        if preview:
-            _show_screenshots_preview(catalog, all_translations)
-            if not typer.confirm("Apply these translations?"):
-                console.print("  [yellow]Cancelled[/yellow]")
-                return
-
-        # Update catalog
-        for target_lang, translations in all_translations.items():
-            locale_data = catalog.get_or_create_locale(target_lang)
-
-            for (screen_id, text_type, device_class), translated_text in translations.items():
-                target_screen = locale_data.get_or_create_screen(screen_id)
-                target_screen.set_text_variant(text_type, device_class, translated_text)
-
-        # Write file
-        write_screenshots(catalog, path, backup=backup)
-
-        console.print(f"\n[green]Saved translations to {path}[/green]")
-
-
-def _show_screenshots_preview(catalog, all_translations: dict) -> None:
-    """Show preview of screenshot translations."""
-    table = Table(title="Translation Preview")
-    table.add_column("Language", style="cyan")
-    table.add_column("Screen", style="white")
-    table.add_column("Type", style="yellow")
-    table.add_column("Original", style="dim")
-    table.add_column("Translation", style="green")
-
-    count = 0
-    for lang, translations in all_translations.items():
-        for (screen_id, text_type, device_class), translated in translations.items():
-            screen = catalog.screens.get(screen_id)
-            original = ""
-            if screen:
-                text = screen.get_text(text_type)
-                if text:
-                    original = text.get_variant(device_class) or ""
-
-            orig_preview = original[:25] + "..." if len(original) > 25 else original
-            trans_preview = translated[:25] + "..." if len(translated) > 25 else translated
-
-            table.add_row(
-                lang,
-                screen_id,
-                f"{text_type.value}/{device_class.value}",
-                orig_preview,
-                trans_preview,
-            )
-            count += 1
-            if count >= 20:
-                break
-        if count >= 20:
-            break
-
-    total = sum(len(t) for t in all_translations.values())
-    if total > 20:
-        table.add_row("...", "", "", "", f"({total - 20} more)")
+        if len(task.items) > 20:
+            table.add_row(lang, f"... ({len(task.items) - 20} more)", "", "", "")
 
     console.print(table)

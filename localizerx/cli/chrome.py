@@ -13,6 +13,13 @@ from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
+from localizerx.adapters.repository import ExtensionCatalogRepository
+from localizerx.core.use_cases.translate_extension import (
+    ExtensionTranslationPreview,
+    ExtensionTranslationTask,
+    TranslateExtensionRequest,
+    TranslateExtensionUseCase,
+)
 from localizerx.utils.locale import (
     chrome_to_standard_locale,
     get_chrome_locale_name,
@@ -246,11 +253,7 @@ def _run_chrome_translate(
     remove: str | None = None,
 ) -> None:
     """Core Chrome Extension translation logic."""
-    from localizerx.io.extension import (
-        delete_extension_locale,
-        detect_extension_path,
-        read_extension,
-    )
+    from localizerx.io.extension import detect_extension_path
     from localizerx.parser.extension_model import KNOWN_CWS_KEYS
 
     config = load_config()
@@ -267,11 +270,6 @@ def _run_chrome_translate(
         codes = ", ".join(invalid_locales)
         console.print(f"[yellow]Warning:[/yellow] Unrecognized locale codes: {codes}")
 
-    # Parse keys filter
-    keys_filter: list[str] | None = None
-    if keys:
-        keys_filter = [k.strip() for k in keys.split(",") if k.strip()]
-
     # Find _locales path
     if path is None:
         path = detect_extension_path()
@@ -284,107 +282,140 @@ def _run_chrome_translate(
         console.print(f"[red]Error:[/red] Path does not exist: {path}")
         raise typer.Exit(1)
 
-    # Handle removal first
-    actually_removed = []
-    if remove_locales:
-        for loc in remove_locales:
-            if loc == src:
-                console.print(f"[yellow]Skipping source locale removal:[/yellow] {loc}")
-                continue
-
-            if dry_run:
-                actually_removed.append(loc)
-                continue
-
-            if delete_extension_locale(path, loc):
-                actually_removed.append(loc)
-
-        if actually_removed:
-            status = "Would remove" if dry_run else "Removed"
-            console.print(
-                f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] "
-                f"{', '.join(actually_removed)}"
-            )
-
-        if not target_locales:
-            if dry_run:
-                console.print("\n[yellow]Dry run - no changes made[/yellow]")
-            return
-
-    # Read catalog
-    try:
-        catalog = read_extension(path, source_locale=src)
-    except (FileNotFoundError, ValueError) as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
-
-    source = catalog.get_source_locale()
-    if not source:
-        console.print(f"[red]Error:[/red] Source locale '{src}' not found in _locales/")
-        console.print(f"Available locales: {', '.join(catalog.locales.keys())}")
-        raise typer.Exit(1)
-
-    console.print(f"[bold]Locales Directory:[/bold] {path}")
-    console.print(f"[bold]Source:[/bold] {get_chrome_locale_name(src)} ({src})")
-    target_display = ", ".join(f"{get_chrome_locale_name(loc)} ({loc})" for loc in target_locales)
-    console.print(f"[bold]Targets:[/bold] {target_display}")
-    console.print()
-
-    # Determine messages to translate per locale
-    translation_tasks: dict[str, list] = {}  # locale -> list of ExtensionMessage
-
-    for target_locale in target_locales:
-        if overwrite:
-            # Translate all specified keys (or all source keys)
-            candidates = keys_filter or list(source.messages.keys())
-            needs = [
-                source.get_message(k)
-                for k in candidates
-                if source.get_message(k) and source.get_message(k).message.strip()
-            ]
-        else:
-            needs = catalog.get_messages_needing_translation(target_locale, keys_filter)
-
-        if needs:
-            translation_tasks[target_locale] = needs
-
-    if not translation_tasks:
-        console.print("[green]All messages already translated[/green]")
-        return
-
-    # Show summary
-    for locale, msgs in translation_tasks.items():
-        cws_count = sum(1 for m in msgs if m.key in KNOWN_CWS_KEYS)
-        regular_count = len(msgs) - cws_count
-        parts = []
-        if cws_count:
-            parts.append(f"{cws_count} CWS field(s)")
-        if regular_count:
-            parts.append(f"{regular_count} message(s)")
-        console.print(f"  {get_chrome_locale_name(locale)}: {', '.join(parts)}")
-
-    if dry_run:
-        console.print("\n[yellow]Dry run - no changes made[/yellow]")
-        _show_chrome_dry_run(translation_tasks)
-        return
-
-    # Perform translation
-    asyncio.run(
-        _translate_chrome(
-            catalog=catalog,
-            path=path,
-            source_locale=src,
-            translation_tasks=translation_tasks,
-            config=config,
-            limit_action=limit_action,
-            preview=preview,
-            backup=backup,
-            model=model,
-        )
+    repository = ExtensionCatalogRepository()
+    
+    cache_dir = get_cache_dir(config)
+    actual_model = model or config.chrome.model
+    
+    thinking_level = getattr(config.chrome, "thinking_level", "0")
+    thinking_config = (
+        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
     )
 
+    # Callbacks
+    def on_remove(locales: list[str]):
+        status = "Would remove" if dry_run else "Removed"
+        console.print(
+            f"[yellow]{status} {len(locales)} locale(s):[/yellow] "
+            f"{', '.join(locales)}"
+        )
 
-def _show_chrome_dry_run(tasks: dict[str, list]) -> None:
+    def on_task_summary(tasks: dict[str, ExtensionTranslationTask]):
+        for locale, task in tasks.items():
+            cws_count = sum(1 for m in task.messages if m.key in KNOWN_CWS_KEYS)
+            regular_count = len(task.messages) - cws_count
+            parts = []
+            if cws_count:
+                parts.append(f"{cws_count} CWS field(s)")
+            if regular_count:
+                parts.append(f"{regular_count} message(s)")
+            console.print(f"  {get_chrome_locale_name(locale)}: {', '.join(parts)}")
+            
+        if dry_run:
+            console.print("\n[yellow]Dry run - no changes made[/yellow]")
+            _show_chrome_dry_run_from_tasks(tasks)
+
+    progress = None
+    
+    def on_translation_start(locale: str, total: int):
+        nonlocal progress
+        if not progress:
+            progress = create_progress()
+            progress.start()
+        console.print(f"  Translating to {get_chrome_locale_name(locale)}...")
+        return progress.add_task(f"    {locale}", total=total)
+
+    def on_translation_progress(task_id, advance_by):
+        if progress:
+            progress.advance(task_id, advance_by)
+
+    def on_preview_request(items: list[ExtensionTranslationPreview]) -> bool:
+        if progress:
+            progress.stop()
+        table = Table(title="Translation Preview")
+        table.add_column("Locale", style="cyan")
+        table.add_column("Key", style="white")
+        table.add_column("Translation", style="green")
+        table.add_column("Chars", style="yellow")
+        
+        for i, item in enumerate(items):
+            if i >= 20:
+                break
+            preview_value = item.translation[:60] + "..." if len(item.translation) > 60 else item.translation
+            preview_value = preview_value.replace("\n", " ")
+            
+            chars_display = str(item.chars)
+            if item.is_over_limit:
+                chars_display = f"[red]{chars_display} (limit {item.limit})[/red]"
+                
+            table.add_row(item.locale, item.key[:30], preview_value, chars_display)
+            
+        if len(items) > 20:
+            table.add_row("...", "", f"({len(items) - 20} more)", "")
+            
+        console.print(table)
+        apply = typer.confirm("Apply these translations?")
+        if not apply:
+            console.print("  [yellow]Cancelled[/yellow]")
+        return apply
+
+    async def _run_async():
+        async with GeminiTranslator(
+            thinking_config=thinking_config,
+            model=actual_model,
+            batch_size=config.chrome.batch_size,
+            max_retries=config.chrome.max_retries,
+            cache_dir=cache_dir,
+        ) as translator:
+            
+            use_case = TranslateExtensionUseCase(repository=repository, translator=translator)
+            request = TranslateExtensionRequest(
+                path=path,
+                source_locale=src,
+                target_locales=target_locales,
+                remove_locales=remove_locales,
+                dry_run=dry_run,
+                preview=preview,
+                overwrite=overwrite,
+                backup=backup,
+                limit_action=limit_action,
+            )
+            
+            try:
+                result = await use_case.execute(
+                    request=request,
+                    on_remove=on_remove,
+                    on_task_summary=on_task_summary,
+                    on_translation_start=on_translation_start,
+                    on_translation_progress=on_translation_progress,
+                    on_preview_request=on_preview_request,
+                )
+                
+                if result.saved:
+                    console.print(f"\n[green]Saved translations to {path}[/green]")
+                elif not result.tasks and not result.removed_locales and not dry_run:
+                     console.print("[green]All messages already translated[/green]")
+                
+                if result.limit_warnings:
+                    console.print(f"\n[yellow]Character limit warnings ({len(result.limit_warnings)}):[/yellow]")
+                    for warning in result.limit_warnings[:10]:
+                        console.print(f"  {warning}")
+                    if len(result.limit_warnings) > 10:
+                        console.print(f"  ... and {len(result.limit_warnings) - 10} more")
+                     
+            finally:
+                if progress:
+                    progress.stop()
+
+    asyncio.run(_run_async())
+
+
+def _show_dry_run_table(tasks: dict[str, ExtensionTranslationTask]) -> None:
+    """Show table of messages that would be translated."""
+    # This matches the legacy function's signature but we'll use our Task objects
+    _show_chrome_dry_run_from_tasks(tasks)
+
+def _show_chrome_dry_run_from_tasks(tasks: dict[str, ExtensionTranslationTask]) -> None:
     """Show table of messages that would be translated."""
     from localizerx.parser.extension_model import KNOWN_CWS_KEYS
 
@@ -394,194 +425,12 @@ def _show_chrome_dry_run(tasks: dict[str, list]) -> None:
     table.add_column("Type", style="yellow")
     table.add_column("Length", style="green")
 
-    for locale, msgs in tasks.items():
-        for msg in msgs[:20]:
+    for locale, task in tasks.items():
+        for msg in task.messages[:20]:
             msg_type = "CWS" if msg.key in KNOWN_CWS_KEYS else "msg"
             table.add_row(locale, msg.key[:40], msg_type, str(msg.char_count))
 
-        if len(msgs) > 20:
-            table.add_row(locale, f"... ({len(msgs) - 20} more)", "", "")
-
-    console.print(table)
-
-
-async def _translate_chrome(
-    catalog,
-    path: Path,
-    source_locale: str,
-    translation_tasks: dict[str, list],
-    config,
-    limit_action,
-    preview: bool,
-    backup: bool,
-    model: str | None,
-) -> None:
-    """Perform Chrome Extension translations and update files."""
-    from localizerx.io.extension import write_extension
-    from localizerx.parser.extension_model import KNOWN_CWS_KEYS, ExtensionFieldType
-    from localizerx.translator.extension_prompts import (
-        build_extension_field_prompt,
-    )
-    from localizerx.utils.limits import LimitAction, truncate_to_limit, validate_limit
-
-    cache_dir = get_cache_dir(config)
-    actual_model = model or config.chrome.model
-
-    thinking_level = getattr(config.chrome, "thinking_level", "0")
-    thinking_config = (
-        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
-    )
-
-    async with GeminiTranslator(
-        thinking_config=thinking_config,
-        model=actual_model,
-        batch_size=config.chrome.batch_size,
-        max_retries=config.chrome.max_retries,
-        cache_dir=cache_dir,
-    ) as translator:
-        all_translations: dict[str, dict[str, str]] = {}  # locale -> {key: translated}
-        limit_warnings: list[str] = []
-
-        for target_locale, messages in translation_tasks.items():
-            console.print(f"  Translating to {get_chrome_locale_name(target_locale)}...")
-            all_translations[target_locale] = {}
-
-            # Separate CWS fields from regular messages
-            cws_messages = [m for m in messages if m.key in KNOWN_CWS_KEYS]
-            regular_messages = [m for m in messages if m.key not in KNOWN_CWS_KEYS]
-
-            # Use standard locale codes for Gemini API
-            src_std = chrome_to_standard_locale(source_locale)
-            tgt_std = chrome_to_standard_locale(target_locale)
-
-            total = len(messages)
-
-            with create_progress() as progress:
-                task = progress.add_task(f"    {target_locale}", total=total)
-
-                # 1. Translate CWS fields one-by-one with specialized prompts
-                for msg in cws_messages:
-                    field_type = ExtensionFieldType(msg.key)
-                    prompt = build_extension_field_prompt(
-                        text=msg.message,
-                        key=msg.key,
-                        description=msg.description,
-                        field_type=field_type,
-                        src_lang=source_locale,
-                        tgt_lang=target_locale,
-                    )
-
-                    try:
-                        translated = await translator._call_api(prompt)
-                        translated = translated.strip()
-                    except Exception as e:
-                        console.print(f"    [red]Error translating {msg.key}: {e}[/red]")
-                        progress.advance(task)
-                        continue
-
-                    # Validate against limit
-                    validation = validate_limit(translated, field_type)
-
-                    if not validation.is_valid:
-                        warning = (
-                            f"[{target_locale}] {msg.key}: "
-                            f"{validation.char_count}/{validation.limit} chars "
-                            f"(over by {validation.chars_over})"
-                        )
-                        limit_warnings.append(warning)
-
-                        if limit_action == LimitAction.ERROR:
-                            console.print(f"    [red]Error: {warning}[/red]")
-                            raise typer.Exit(1)
-                        elif limit_action == LimitAction.TRUNCATE:
-                            translated = truncate_to_limit(translated, field_type)
-                            console.print(f"    [yellow]Truncated: {msg.key}[/yellow]")
-                        else:  # warn
-                            console.print(f"    [yellow]Warning: {warning}[/yellow]")
-
-                    all_translations[target_locale][msg.key] = translated
-                    progress.advance(task)
-
-                # 2. Translate regular messages in batches
-                if regular_messages:
-                    requests = [
-                        TranslationRequest(
-                            key=m.key,
-                            text=m.message,
-                            comment=m.description,
-                        )
-                        for m in regular_messages
-                    ]
-
-                    results = await translator.translate_batch(requests, src_std, tgt_std)
-
-                    for result in results:
-                        if result.success and result.translated:
-                            all_translations[target_locale][result.key] = result.translated
-                        progress.advance(task)
-
-        # Show preview if requested
-        if preview:
-            _show_chrome_preview(catalog, all_translations)
-            if not typer.confirm("Apply these translations?"):
-                console.print("  [yellow]Cancelled[/yellow]")
-                return
-
-        # Update catalog
-        source = catalog.get_source_locale()
-        for target_locale, translations in all_translations.items():
-            locale_data = catalog.get_or_create_locale(target_locale)
-            for key, translated_text in translations.items():
-                # Preserve description and placeholders from source
-                src_msg = source.get_message(key) if source else None
-                locale_data.set_message(
-                    key=key,
-                    message=translated_text,
-                    description=src_msg.description if src_msg else None,
-                    placeholders=src_msg.placeholders if src_msg else None,
-                )
-
-        # Write files
-        write_extension(
-            catalog,
-            path,
-            backup=backup,
-            locales=list(all_translations.keys()),
-        )
-
-        console.print(f"\n[green]Saved translations to {path}[/green]")
-
-        # Show limit warnings summary
-        if limit_warnings:
-            console.print(f"\n[yellow]Character limit warnings ({len(limit_warnings)}):[/yellow]")
-            for warning in limit_warnings[:10]:
-                console.print(f"  {warning}")
-            if len(limit_warnings) > 10:
-                console.print(f"  ... and {len(limit_warnings) - 10} more")
-
-
-def _show_chrome_preview(catalog, all_translations: dict) -> None:
-    """Show preview of Chrome Extension translations."""
-    table = Table(title="Translation Preview")
-    table.add_column("Locale", style="cyan")
-    table.add_column("Key", style="white")
-    table.add_column("Translation", style="green")
-    table.add_column("Chars", style="yellow")
-
-    count = 0
-    for locale, translations in all_translations.items():
-        for key, value in translations.items():
-            preview_value = value[:60] + "..." if len(value) > 60 else value
-            preview_value = preview_value.replace("\n", " ")
-            table.add_row(locale, key[:30], preview_value, str(len(value)))
-            count += 1
-            if count >= 20:
-                break
-        if count >= 20:
-            break
-
-    total = sum(len(t) for t in all_translations.values())
-    if total > 20:
-        table.add_row("...", "", f"({total - 20} more)", "")
+        if len(task.messages) > 20:
+            table.add_row(locale, f"... ({len(task.messages) - 20} more)", "", "")
 
     console.print(table)

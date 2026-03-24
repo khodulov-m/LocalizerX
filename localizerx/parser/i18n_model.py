@@ -80,6 +80,7 @@ class I18nCatalog(BaseModel):
     def get_messages_needing_translation(
         self,
         target_locale: str,
+        overwrite: bool = False,
     ) -> list[I18nMessage]:
         """Get source messages that need translation for a target locale.
 
@@ -96,6 +97,11 @@ class I18nCatalog(BaseModel):
         for key, src_msg in source.messages.items():
             if not src_msg.needs_translation:
                 continue
+            
+            if overwrite:
+                needs_translation.append(src_msg)
+                continue
+                
             if target is None or target.get_message(key) is None:
                 needs_translation.append(src_msg)
             elif target.get_message(key).value.strip() == "":
