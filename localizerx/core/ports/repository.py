@@ -2,23 +2,25 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Generic, TypeVar
 
-from localizerx.parser.model import StringCatalog
+T = TypeVar("T")
 
 
-class CatalogRepository(ABC):
+class CatalogRepository(ABC, Generic[T]):
     """Abstract interface for catalog storage and retrieval."""
 
     @abstractmethod
-    def read(self, path: Path) -> StringCatalog:
+    def read(self, path: Path, **kwargs) -> T:
         """
         Read a catalog from the specified path.
         
         Args:
             path: Path to the catalog file
+            **kwargs: Implementation specific arguments (e.g. source_locale)
             
         Returns:
-            The parsed StringCatalog
+            The parsed catalog
             
         Raises:
             FileNotFoundError: If the file does not exist
@@ -27,13 +29,14 @@ class CatalogRepository(ABC):
         ...
 
     @abstractmethod
-    def write(self, catalog: StringCatalog, path: Path, backup: bool = False) -> None:
+    def write(self, catalog: T, path: Path, backup: bool = False, **kwargs) -> None:
         """
         Write a catalog to the specified path.
         
         Args:
-            catalog: The StringCatalog to write
+            catalog: The catalog to write
             path: Path to write the catalog to
             backup: Whether to create a backup of the existing file
+            **kwargs: Implementation specific arguments
         """
         ...

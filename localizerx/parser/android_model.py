@@ -79,6 +79,7 @@ class AndroidCatalog(BaseModel):
     def get_strings_needing_translation(
         self,
         target_locale: str,
+        overwrite: bool = False,
     ) -> list[AndroidString]:
         """Get source strings that need translation for a target locale."""
         source = self.get_source_locale()
@@ -90,6 +91,11 @@ class AndroidCatalog(BaseModel):
         for name, src_str in source.strings.items():
             if not src_str.needs_translation:
                 continue
+            
+            if overwrite:
+                needs.append(src_str)
+                continue
+                
             if target is None or name not in target.strings:
                 needs.append(src_str)
             elif not target.strings[name].value.strip():
@@ -99,6 +105,7 @@ class AndroidCatalog(BaseModel):
     def get_arrays_needing_translation(
         self,
         target_locale: str,
+        overwrite: bool = False,
     ) -> list[AndroidStringArray]:
         """Get source string-arrays that need translation."""
         source = self.get_source_locale()
@@ -110,6 +117,11 @@ class AndroidCatalog(BaseModel):
         for name, src_arr in source.string_arrays.items():
             if not src_arr.translatable:
                 continue
+            
+            if overwrite:
+                needs.append(src_arr)
+                continue
+                
             if target is None or name not in target.string_arrays:
                 needs.append(src_arr)
         return needs
@@ -117,6 +129,7 @@ class AndroidCatalog(BaseModel):
     def get_plurals_needing_translation(
         self,
         target_locale: str,
+        overwrite: bool = False,
     ) -> list[AndroidPlural]:
         """Get source plurals that need translation."""
         source = self.get_source_locale()
@@ -128,6 +141,11 @@ class AndroidCatalog(BaseModel):
         for name, src_plural in source.plurals.items():
             if not src_plural.translatable:
                 continue
+            
+            if overwrite:
+                needs.append(src_plural)
+                continue
+                
             if target is None or name not in target.plurals:
                 needs.append(src_plural)
         return needs

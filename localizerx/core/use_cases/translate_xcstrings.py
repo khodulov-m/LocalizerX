@@ -49,7 +49,7 @@ class TranslateCatalogResult:
 class TranslateCatalogUseCase:
     """Orchestrates the translation of a string catalog."""
 
-    def __init__(self, repository: CatalogRepository, translator: Translator):
+    def __init__(self, repository: CatalogRepository[StringCatalog], translator: Translator):
         self.repository = repository
         self.translator = translator
 
