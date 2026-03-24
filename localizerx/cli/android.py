@@ -13,6 +13,13 @@ from localizerx.cli.utils import console, create_progress
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
+from localizerx.adapters.repository import AndroidCatalogRepository
+from localizerx.core.use_cases.translate_android import (
+    AndroidTranslationPreview,
+    AndroidTranslationTask,
+    TranslateAndroidRequest,
+    TranslateAndroidUseCase,
+)
 from localizerx.utils.locale import (
     get_language_name,
     parse_language_list,
@@ -222,7 +229,7 @@ def _run_android_translate(
     remove: str | None = None,
 ) -> None:
     """Core Android translation logic."""
-    from localizerx.io.android import delete_android_locale, detect_android_path, read_android
+    from localizerx.io.android import detect_android_path
 
     config = load_config()
 
@@ -241,44 +248,16 @@ def _run_android_translate(
         console.print(f"[red]Error:[/red] Path does not exist: {path}")
         raise typer.Exit(1)
 
-    # Handle removal first
-    actually_removed = []
-    if remove_locales:
-        for loc in remove_locales:
-            if loc == src:
-                console.print(f"[yellow]Skipping source locale removal:[/yellow] {loc}")
-                continue
-
-            if dry_run:
-                actually_removed.append(loc)
-                continue
-
-            if delete_android_locale(path, loc):
-                actually_removed.append(loc)
-
-        if actually_removed:
-            status = "Would remove" if dry_run else "Removed"
-            console.print(
-                f"[yellow]{status} {len(actually_removed)} locale(s):[/yellow] "
-                f"{', '.join(actually_removed)}"
-            )
-
-        if not target_locales:
-            if dry_run:
-                console.print("\n[yellow]Dry run - no changes made[/yellow]")
-            return
-
-    try:
-        catalog = read_android(path, source_locale=src)
-    except (FileNotFoundError, ValueError) as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
-
-    source = catalog.get_source_locale()
-    if not source:
-        console.print(f"[red]Error:[/red] Source locale '{src}' not found")
-        console.print(f"Available locales: {', '.join(catalog.locales.keys())}")
-        raise typer.Exit(1)
+    repository = AndroidCatalogRepository()
+    
+    cache_dir = get_cache_dir(config)
+    actual_batch_size = batch_size or config.android.batch_size
+    actual_model = model or config.android.model
+    
+    thinking_level = getattr(config.android, "thinking_level", "0")
+    thinking_config = (
+        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
+    )
 
     console.print(f"[bold]Resource Directory:[/bold] {path}")
     console.print(f"[bold]Source:[/bold] {get_language_name(src)} ({src})")
@@ -287,67 +266,112 @@ def _run_android_translate(
         console.print(f"[bold]Targets:[/bold] {target_display}")
     console.print()
 
-    # Determine what to translate per locale
-    translation_tasks: dict[str, dict] = {}
-
-    for target_locale in target_locales:
-        task: dict[str, list] = {"strings": [], "arrays": [], "plurals": []}
-
-        if overwrite:
-            task["strings"] = list(source.translatable_strings)
-        else:
-            task["strings"] = catalog.get_strings_needing_translation(target_locale)
-
-        if include_arrays:
-            if overwrite:
-                task["arrays"] = [a for a in source.string_arrays.values() if a.translatable]
-            else:
-                task["arrays"] = catalog.get_arrays_needing_translation(target_locale)
-
-        if include_plurals:
-            if overwrite:
-                task["plurals"] = [p for p in source.plurals.values() if p.translatable]
-            else:
-                task["plurals"] = catalog.get_plurals_needing_translation(target_locale)
-
-        if task["strings"] or task["arrays"] or task["plurals"]:
-            translation_tasks[target_locale] = task
-
-    if not translation_tasks:
-        console.print("[green]All strings already translated[/green]")
-        return
-
-    for locale, task in translation_tasks.items():
-        parts = []
-        if task["strings"]:
-            parts.append(f"{len(task['strings'])} string(s)")
-        if task["arrays"]:
-            parts.append(f"{len(task['arrays'])} array(s)")
-        if task["plurals"]:
-            parts.append(f"{len(task['plurals'])} plural(s)")
-        console.print(f"  {get_language_name(locale)}: {', '.join(parts)}")
-
-    if dry_run:
-        console.print("\n[yellow]Dry run - no changes made[/yellow]")
-        _show_android_dry_run(translation_tasks)
-        return
-
-    asyncio.run(
-        _translate_android(
-            catalog=catalog,
-            path=path,
-            source_locale=src,
-            translation_tasks=translation_tasks,
-            config=config,
-            preview=preview,
-            backup=backup,
-            batch_size=batch_size,
-            model=model,
+    # Callbacks
+    def on_remove(locales: list[str]):
+        status = "Would remove" if dry_run else "Removed"
+        console.print(
+            f"[yellow]{status} {len(locales)} locale(s):[/yellow] "
+            f"{', '.join(locales)}"
         )
-    )
+
+    def on_task_summary(tasks: dict[str, AndroidTranslationTask]):
+        for locale, task in tasks.items():
+            parts = []
+            if task.strings:
+                parts.append(f"{len(task.strings)} string(s)")
+            if task.arrays:
+                parts.append(f"{len(task.arrays)} array(s)")
+            if task.plurals:
+                parts.append(f"{len(task.plurals)} plural(s)")
+            console.print(f"  {get_language_name(locale)}: {', '.join(parts)}")
+            
+        if dry_run:
+            console.print("\n[yellow]Dry run - no changes made[/yellow]")
+            _show_android_dry_run_from_tasks(tasks)
+
+    progress = None
+    
+    def on_translation_start(locale: str, total: int):
+        nonlocal progress
+        if not progress:
+            progress = create_progress()
+            progress.start()
+        console.print(f"  Translating to {get_language_name(locale)}...")
+        return progress.add_task(f"    {locale}", total=total)
+
+    def on_translation_progress(task_id, advance_by):
+        if progress:
+            progress.advance(task_id, advance_by)
+
+    def on_preview_request(items: list[AndroidTranslationPreview]) -> bool:
+        if progress:
+            progress.stop()
+        table = Table(title="Translation Preview")
+        table.add_column("Locale", style="cyan")
+        table.add_column("Name", style="white")
+        table.add_column("Translation", style="green")
+        
+        for i, item in enumerate(items):
+            if i >= 20:
+                break
+            preview_value = item.translation[:60] + "..." if len(item.translation) > 60 else item.translation
+            table.add_row(item.locale, item.name, preview_value)
+            
+        if len(items) > 20:
+            table.add_row("...", "", f"({len(items) - 20} more)")
+            
+        console.print(table)
+        apply = typer.confirm("Apply these translations?")
+        if not apply:
+            console.print("  [yellow]Cancelled[/yellow]")
+        return apply
+
+    async def _run_async():
+        async with GeminiTranslator(
+            thinking_config=thinking_config,
+            model=actual_model,
+            batch_size=actual_batch_size,
+            max_retries=config.android.max_retries,
+            cache_dir=cache_dir,
+        ) as translator:
+            
+            use_case = TranslateAndroidUseCase(repository=repository, translator=translator)
+            request = TranslateAndroidRequest(
+                path=path,
+                source_locale=src,
+                target_locales=target_locales,
+                remove_locales=remove_locales,
+                include_arrays=include_arrays,
+                include_plurals=include_plurals,
+                dry_run=dry_run,
+                preview=preview,
+                overwrite=overwrite,
+                backup=backup,
+            )
+            
+            try:
+                result = await use_case.execute(
+                    request=request,
+                    on_remove=on_remove,
+                    on_task_summary=on_task_summary,
+                    on_translation_start=on_translation_start,
+                    on_translation_progress=on_translation_progress,
+                    on_preview_request=on_preview_request,
+                )
+                
+                if result.saved:
+                    console.print(f"\n[green]Saved translations to {path}[/green]")
+                elif not result.tasks and not result.removed_locales and not dry_run:
+                     console.print("[green]All strings already translated[/green]")
+                     
+            finally:
+                if progress:
+                    progress.stop()
+
+    asyncio.run(_run_async())
 
 
-def _show_android_dry_run(tasks: dict[str, dict]) -> None:
+def _show_android_dry_run_from_tasks(tasks: dict[str, AndroidTranslationTask]) -> None:
     """Show table of strings that would be translated."""
     table = Table(title="Strings to Translate")
     table.add_column("Locale", style="cyan")
@@ -356,172 +380,21 @@ def _show_android_dry_run(tasks: dict[str, dict]) -> None:
     table.add_column("Value", style="green")
 
     for locale, task in tasks.items():
-        for s in task["strings"][:15]:
+        for s in task.strings[:15]:
             display = s.value[:40] + "..." if len(s.value) > 40 else s.value
             table.add_row(locale, "string", s.name, display)
-        for a in task["arrays"][:5]:
+        for a in task.arrays[:5]:
             table.add_row(locale, "array", a.name, f"{len(a.items)} items")
-        for p in task["plurals"][:5]:
+        for p in task.plurals[:5]:
             table.add_row(locale, "plural", p.name, f"{len(p.items)} forms")
 
-        total = len(task["strings"]) + len(task["arrays"]) + len(task["plurals"])
+        total = len(task.strings) + len(task.arrays) + len(task.plurals)
         shown = (
-            min(len(task["strings"]), 15)
-            + min(len(task["arrays"]), 5)
-            + min(len(task["plurals"]), 5)
+            min(len(task.strings), 15)
+            + min(len(task.arrays), 5)
+            + min(len(task.plurals), 5)
         )
         if total > shown:
             table.add_row(locale, "", f"... ({total - shown} more)", "")
-
-    console.print(table)
-
-
-async def _translate_android(
-    catalog,
-    path: Path,
-    source_locale: str,
-    translation_tasks: dict[str, dict],
-    config,
-    preview: bool,
-    backup: bool,
-    batch_size: int | None,
-    model: str | None,
-) -> None:
-    """Perform Android translations and update catalog."""
-    from localizerx.io.android import write_android
-    from localizerx.parser.android_model import AndroidPlural, AndroidString, AndroidStringArray
-
-    cache_dir = get_cache_dir(config)
-    actual_batch_size = batch_size or config.android.batch_size
-    actual_model = model or config.android.model
-
-    thinking_level = getattr(config.android, "thinking_level", "0")
-    thinking_config = (
-        {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
-    )
-
-    async with GeminiTranslator(
-        thinking_config=thinking_config,
-        model=actual_model,
-        batch_size=actual_batch_size,
-        max_retries=config.android.max_retries,
-        cache_dir=cache_dir,
-    ) as translator:
-        all_results: dict[str, dict] = {}  # locale -> {strings: {}, arrays: {}, plurals: {}}
-
-        for target_locale, task in translation_tasks.items():
-            console.print(f"  Translating to {get_language_name(target_locale)}...")
-            all_results[target_locale] = {"strings": {}, "arrays": {}, "plurals": {}}
-
-            total = len(task["strings"]) + len(task["arrays"]) + len(task["plurals"])
-
-            with create_progress() as progress:
-                ptask = progress.add_task(f"    {target_locale}", total=total)
-
-                # Translate strings in batch
-                if task["strings"]:
-                    requests = [
-                        TranslationRequest(key=s.name, text=s.value, comment=s.comment)
-                        for s in task["strings"]
-                    ]
-                    results = await translator.translate_batch(
-                        requests, source_locale, target_locale
-                    )
-                    for result in results:
-                        if result.success and result.translated:
-                            all_results[target_locale]["strings"][result.key] = result.translated
-                        progress.advance(ptask)
-
-                # Translate arrays (each item individually, batched)
-                for arr in task["arrays"]:
-                    requests = [
-                        TranslationRequest(key=f"{arr.name}[{i}]", text=item)
-                        for i, item in enumerate(arr.items)
-                    ]
-                    results = await translator.translate_batch(
-                        requests, source_locale, target_locale
-                    )
-                    translated_items = []
-                    for result in results:
-                        if result.success and result.translated:
-                            translated_items.append(result.translated)
-                        else:
-                            # Keep original on failure
-                            idx = int(result.key.split("[")[1].rstrip("]"))
-                            translated_items.append(arr.items[idx])
-                    all_results[target_locale]["arrays"][arr.name] = translated_items
-                    progress.advance(ptask)
-
-                # Translate plurals (each quantity individually)
-                for plural in task["plurals"]:
-                    requests = [
-                        TranslationRequest(key=f"{plural.name}:{qty}", text=text)
-                        for qty, text in plural.items.items()
-                    ]
-                    results = await translator.translate_batch(
-                        requests, source_locale, target_locale
-                    )
-                    translated_items = {}
-                    for result in results:
-                        if result.success and result.translated:
-                            qty = result.key.split(":")[1]
-                            translated_items[qty] = result.translated
-                    all_results[target_locale]["plurals"][plural.name] = translated_items
-                    progress.advance(ptask)
-
-        # Show preview if requested
-        if preview:
-            _show_android_preview(all_results)
-            if not typer.confirm("Apply these translations?"):
-                console.print("  [yellow]Cancelled[/yellow]")
-                return
-
-        # Update catalog
-        for target_locale, results in all_results.items():
-            locale_data = catalog.get_or_create_locale(target_locale)
-
-            for name, value in results["strings"].items():
-                locale_data.strings[name] = AndroidString(name=name, value=value)
-
-            for name, items in results["arrays"].items():
-                locale_data.string_arrays[name] = AndroidStringArray(name=name, items=items)
-
-            for name, items in results["plurals"].items():
-                locale_data.plurals[name] = AndroidPlural(name=name, items=items)
-
-        # Write files
-        write_android(
-            catalog,
-            path,
-            backup=backup,
-            locales=list(all_results.keys()),
-        )
-
-        console.print(f"\n[green]Saved translations to {path}[/green]")
-
-
-def _show_android_preview(all_results: dict) -> None:
-    """Show preview of Android translations."""
-    table = Table(title="Translation Preview")
-    table.add_column("Locale", style="cyan")
-    table.add_column("Name", style="white")
-    table.add_column("Translation", style="green")
-
-    count = 0
-    for locale, results in all_results.items():
-        for name, value in results["strings"].items():
-            preview_value = value[:60] + "..." if len(value) > 60 else value
-            table.add_row(locale, name, preview_value)
-            count += 1
-            if count >= 20:
-                break
-        if count >= 20:
-            break
-
-    total = sum(
-        len(r["strings"]) + len(r["arrays"]) + len(r["plurals"]) for r in all_results.values()
-    )
-    if total > 20:
-        table.add_row("...", "", f"({total - 20} more)")
 
     console.print(table)
