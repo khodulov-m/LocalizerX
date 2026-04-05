@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LocalizerX (or `lrx` for short) is a Python CLI tool for macOS that automates translation of Xcode String Catalogs (`.xcstrings` files), App Store metadata, App Store screenshot texts, and Chrome Extension `_locales/` message files using Google's Gemini API. It handles placeholder preservation, pluralization rules, and developer comments while translating iOS localization files and Chrome Extension messages.
+LocalizerX (or `lrx` for short) is a Python CLI tool for macOS that automates translation of Xcode String Catalogs (`.xcstrings` files), App Store metadata, App Store screenshot texts, Chrome Extension `_locales/` message files, Android `strings.xml`, and frontend i18n JSON files using Google's Gemini API. It handles placeholder preservation, pluralization rules, and developer comments while translating localization files across all supported platforms.
 
 ## AI Agent Skills
 
@@ -20,13 +20,13 @@ ruff check .
 black .
 
 # Testing
-pytest
+uv run python -m pytest
 
 # Run single test
-pytest tests/test_file.py::test_function
+uv run python -m pytest tests/test_file.py::test_function
 
 # Install locally (editable)
-pip install -e .
+pip install -e ".[dev]"
 
 # Run CLI
 localizerx translate <path> --to fr,es,de --src en
@@ -42,36 +42,61 @@ localizerx translate <path> --to fr,es,de --custom-prompt "Do not translate prop
 localizerx delete fr,de --backup
 localizerx delete --all --yes
 localizerx delete ru --keep
+
+# Utility commands
+localizerx list              # List available Gemini models
+localizerx use gemini-2.5-flash-lite  # Set active model in config
+localizerx languages         # List supported locale codes
+localizerx cache-clear       # Clear SQLite translation cache
 ```
 
 ## Architecture
 
+The project follows Clean Architecture. Business logic is isolated from the CLI framework; orchestration happens in Use Cases, which depend on abstract Ports.
+
 ```
-CLI (Typer)
- └─ File Scanner
-     └─ xcstrings Parser
-         └─ Translation Queue
-             └─ Gemini API Adapter
+CLI (Typer)  [localizerx/cli/]
+ └─ Use Cases  [localizerx/core/use_cases/]
+     └─ Ports (abstract)  [localizerx/core/ports/]
+         └─ Adapters (concrete)  [localizerx/adapters/]
+             └─ I/O handlers  [localizerx/io/]
+             └─ Gemini API Adapter  [localizerx/translator/gemini_adapter.py]
                  └─ Post-processing (placeholders, plurals)
-                     └─ Writer + Backup
 ```
 
 ### Package Structure
 
-- `localizerx/cli.py` - Typer-based CLI commands
-- `localizerx/cli/delete.py` - Delete languages from xcstrings files
+- `localizerx/cli/` - Typer-based CLI commands (one module per format/command group)
+  - `translate.py` - `.xcstrings` translation and `info` command
+  - `delete.py` - Delete languages from `.xcstrings` files
+  - `metadata.py` - App Store metadata + `metadata-info`, `metadata-check`, `metadata-urls`
+  - `android.py` - Android `strings.xml` + `android-info`
+  - `chrome.py` - Chrome Extension `_locales/` + `chrome-info`
+  - `i18n.py` - Frontend i18n JSON + `i18n-info`
+  - `screenshots.py` - Screenshot texts: translate, generate, info
+  - `frameit.py` - Fastlane Frameit title/keyword strings
+  - `agent.py` - `init-agent` command
+- `localizerx/core/use_cases/` - Format-specific translation orchestrators (framework-agnostic)
+- `localizerx/core/ports/repository.py` - Abstract cache/repository interface
+- `localizerx/adapters/repository.py` - SQLite cache implementation
 - `localizerx/config.py` - Configuration management (TOML)
-- `localizerx/io/xcstrings.py` - Lossless xcstrings file I/O
-- `localizerx/io/extension.py` - Chrome Extension _locales/ I/O
-- `localizerx/io/screenshots.py` - App Store screenshot texts JSON I/O
-- `localizerx/parser/model.py` - Entry and Translation data models
-- `localizerx/parser/extension_model.py` - Chrome Extension message and catalog data models
-- `localizerx/parser/screenshots_model.py` - Screenshot text data models (ScreenshotsCatalog, ScreenshotScreen, etc.)
-- `localizerx/parser/app_context.py` - AppContext data class for screenshot text generation
+- `localizerx/io/` - Lossless file I/O per format
+  - `xcstrings.py`, `extension.py`, `screenshots.py`, `android.py`, `frameit.py`, `i18n.py`, `metadata.py`
+- `localizerx/parser/` - Domain entities and Pydantic data models
+  - `model.py` - `Entry`, `Translation` (xcstrings)
+  - `extension_model.py` - `ExtensionMessage`, `ExtensionCatalog`
+  - `screenshots_model.py` - `ScreenshotsCatalog`, `ScreenshotScreen`, `ScreenshotText`
+  - `android_model.py` - `AndroidString`, `AndroidPlural`, `AndroidCatalog`
+  - `frameit_model.py` - `FrameitString`, `FrameitCatalog`
+  - `i18n_model.py` - `I18nMessage`, `I18nCatalog`
+  - `metadata_model.py` - `MetadataField`, `MetadataCatalog`, `MetadataFieldType`
+  - `app_context.py` - `AppContext` data class for screenshot text generation
 - `localizerx/translator/base.py` - Abstract translator interface
 - `localizerx/translator/gemini_adapter.py` - Gemini API implementation (async)
 - `localizerx/translator/extension_prompts.py` - SEO-optimized prompts for Chrome Web Store fields
-- `localizerx/translator/screenshots_prompts.py` - ASO-optimized prompts for screenshot text translation (5-word limit)
+- `localizerx/translator/metadata_prompts.py` - ASO-optimized prompts for App Store metadata
+- `localizerx/translator/frameit_prompts.py` - Prompts for Frameit title/keyword strings
+- `localizerx/translator/screenshots_prompts.py` - ASO-optimized prompts for screenshot text translation
 - `localizerx/translator/screenshots_generation_prompts.py` - ASO-optimized prompts for screenshot text generation
 - `localizerx/utils/placeholders.py` - Placeholder masking/unmasking (%@, %d, {name}, $NAME$, $1)
 - `localizerx/utils/locale.py` - Language/locale mapping
@@ -89,6 +114,7 @@ CLI (Typer)
 ### Data Models
 
 ```python
+# xcstrings
 Entry:
   key: str
   source_text: str
@@ -99,6 +125,7 @@ Translation:
   value: str
   variations: dict | None  # for plural/gender forms
 
+# Chrome Extension
 ExtensionMessage:
   key: str
   message: str
@@ -109,6 +136,7 @@ ExtensionCatalog:
   source_locale: str
   locales: dict[str, ExtensionLocale]
 
+# Screenshots
 ScreenshotText:
   small: str | None  # for compact devices (iPhone SE)
   large: str | None  # for large devices (iPad, Pro Max)
@@ -121,6 +149,50 @@ ScreenshotsCatalog:
   screens: dict[str, ScreenshotScreen]
   localizations: dict[str, ScreenshotLocale]
 
+# Android
+AndroidString:
+  name: str
+  value: str
+  translatable: bool
+
+AndroidPlural:
+  name: str
+  items: dict[str, str]  # quantity → string
+
+AndroidCatalog:
+  source_language: str
+  strings: list[AndroidString]
+  arrays: list[AndroidStringArray]
+  plurals: list[AndroidPlural]
+
+# Frontend i18n
+I18nMessage:
+  key: str
+  value: str
+
+I18nCatalog:
+  source_locale: str
+  locales: dict[str, I18nLocale]
+
+# Fastlane metadata
+MetadataField:
+  field_type: MetadataFieldType
+  value: str
+
+MetadataCatalog:
+  source_language: str
+  locales: dict[str, LocaleMetadata]
+
+# Frameit
+FrameitString:
+  key: str
+  value: str
+
+FrameitCatalog:
+  source_language: str
+  locales: dict[str, FrameitLocale]
+
+# App context (for screenshot generation)
 AppContext:
   name: str
   subtitle: str | None

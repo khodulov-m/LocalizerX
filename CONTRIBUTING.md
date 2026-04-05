@@ -11,20 +11,21 @@ started, from environment setup through to submitting a pull request.
 
 ```bash
 # Clone the repository
-git clone https://github.com/localizerx/localizerx.git
-cd localizerx
+git clone https://github.com/khodulov-m/LocalizerX.git
+cd LocalizerX
 
-# Create and activate a virtual environment
+# Option A: uv (recommended — no manual venv needed)
+uv run python -m pytest
+
+# Option B: pip editable install
 python -m venv .venv
 source .venv/bin/activate
-
-# Install the package in editable mode with dev dependencies
 pip install -e ".[dev]"
 ```
 
 Dev dependencies (`pytest`, `pytest-asyncio`, `ruff`, `black`) are declared under
-`[project.optional-dependencies] dev` in `pyproject.toml`. The editable install above
-pulls all of them in.
+`[project.optional-dependencies] dev` in `pyproject.toml`. Both install methods
+above pull all of them in.
 
 ---
 
@@ -71,7 +72,7 @@ ruff check .
 black .
 
 # 3. Test
-pytest
+uv run python -m pytest
 ```
 
 All three are configured in `pyproject.toml`. If `ruff` or `black` report issues,
@@ -80,7 +81,7 @@ fix them before pushing. CI will enforce the same checks.
 To run a single test in isolation:
 
 ```bash
-pytest tests/test_file.py::TestClassName::test_method
+uv run python -m pytest tests/test_file.py::TestClassName::test_method
 ```
 
 ---

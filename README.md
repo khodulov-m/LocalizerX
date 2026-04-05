@@ -236,15 +236,20 @@ We love contributions! To set up for local development:
 ```bash
 git clone https://github.com/khodulov-m/LocalizerX.git
 cd LocalizerX
-python -m venv .venv
-source .venv/bin/activate
+
+# Option A: uv (recommended)
+uv run python -m pytest
+
+# Option B: pip editable install
 pip install -e ".[dev]"
+pytest
 
 # Keep the code quality high!
 ruff check .
 black .
-pytest
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full contribution guidelines.
 
 ---
 
