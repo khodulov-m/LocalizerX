@@ -7,7 +7,13 @@ from typing import Any, Callable
 from localizerx.core.ports.repository import CatalogRepository
 from localizerx.parser.extension_model import ExtensionCatalog, ExtensionMessage
 from localizerx.translator.base import TranslationRequest, Translator
-from localizerx.utils.limits import LimitAction, truncate_to_limit, validate_limit
+from localizerx.utils.limits import (
+    SHORTEN_MAX_RETRIES,
+    LimitAction,
+    build_shorten_prompt,
+    truncate_to_limit,
+    validate_limit,
+)
 
 @dataclass
 class ExtensionTranslationTask:
@@ -132,17 +138,47 @@ class TranslateExtensionUseCase:
                 validation = validate_limit(translated, field_type)
 
                 if not validation.is_valid:
-                    warning = (
-                        f"[{locale}] {msg.key}: "
-                        f"{validation.char_count}/{validation.limit} chars "
-                        f"(over by {validation.chars_over})"
-                    )
-                    limit_warnings.append(warning)
+                    if request.limit_action == LimitAction.RETRY:
+                        from localizerx.utils.locale import get_chrome_locale_name
 
-                    if request.limit_action == LimitAction.ERROR:
-                        raise ValueError(f"Character limit exceeded: {warning}")
-                    elif request.limit_action == LimitAction.TRUNCATE:
-                        translated = truncate_to_limit(translated, field_type)
+                        target_name = get_chrome_locale_name(locale)
+                        current = translated
+                        current_validation = validation
+                        for _ in range(SHORTEN_MAX_RETRIES):
+                            shorten_prompt = build_shorten_prompt(
+                                translation=current,
+                                field_label=field_type.value,
+                                target_language=target_name,
+                                limit=current_validation.limit,
+                            )
+                            retried = (await self.translator._call_api(shorten_prompt)).strip()
+                            if retried:
+                                current = retried
+                                current_validation = validate_limit(current, field_type)
+                                if current_validation.is_valid:
+                                    break
+
+                        if current_validation.is_valid:
+                            translated = current
+                        else:
+                            translated = truncate_to_limit(current, field_type)
+                            limit_warnings.append(
+                                f"[{locale}] {msg.key}: still over after "
+                                f"{SHORTEN_MAX_RETRIES} retries, truncated to "
+                                f"{len(translated)}/{current_validation.limit} chars"
+                            )
+                    else:
+                        warning = (
+                            f"[{locale}] {msg.key}: "
+                            f"{validation.char_count}/{validation.limit} chars "
+                            f"(over by {validation.chars_over})"
+                        )
+                        limit_warnings.append(warning)
+
+                        if request.limit_action == LimitAction.ERROR:
+                            raise ValueError(f"Character limit exceeded: {warning}")
+                        elif request.limit_action == LimitAction.TRUNCATE:
+                            translated = truncate_to_limit(translated, field_type)
 
                 all_results[locale][msg.key] = translated
                 if on_translation_progress and task_id:

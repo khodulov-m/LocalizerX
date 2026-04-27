@@ -80,7 +80,7 @@ class TestMetadataCommand:
 
     def test_metadata_on_limit_options(self, sample_metadata_dir):
         """Test that valid --on-limit values are accepted."""
-        for option in ["warn", "truncate", "error"]:
+        for option in ["warn", "truncate", "error", "retry"]:
             result = runner.invoke(
                 app,
                 [

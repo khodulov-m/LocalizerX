@@ -50,10 +50,13 @@ localizerx metadata examples/metadata --to de-DE --fields name,subtitle,keywords
 ### Handle character limit violations
 
 ```bash
-# Warn but continue (default)
+# Re-ask the model to shorten (default), with truncate as last-resort fallback
+localizerx metadata examples/metadata --to de-DE --on-limit retry
+
+# Warn but keep the over-limit text
 localizerx metadata examples/metadata --to de-DE --on-limit warn
 
-# Auto-truncate to fit limits
+# Hard-truncate to fit limits (cuts at character or comma boundary)
 localizerx metadata examples/metadata --to de-DE --on-limit truncate
 
 # Stop on limit exceeded

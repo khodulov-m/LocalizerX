@@ -14,7 +14,13 @@ class MetadataTranslationTask:
     locale: str
     field_types: list[MetadataFieldType] = field(default_factory=list)
 
-from localizerx.utils.limits import LimitAction, truncate_to_limit, validate_limit
+from localizerx.utils.limits import (
+    SHORTEN_MAX_RETRIES,
+    LimitAction,
+    build_shorten_prompt,
+    truncate_to_limit,
+    validate_limit,
+)
 
 @dataclass
 class TranslateMetadataRequest:
@@ -147,21 +153,56 @@ class TranslateMetadataUseCase:
             all_results[loc] = res
 
         # Validate character limits
+        from localizerx.utils.locale import get_fastlane_locale_name
+
         for target_locale, translations in all_results.items():
             for field_type, translated in list(translations.items()):
                 validation = validate_limit(translated, field_type)
-                if not validation.is_valid:
-                    warning = (
-                        f"[{target_locale}] {field_type.value}: "
-                        f"{validation.char_count}/{validation.limit} chars "
-                        f"(over by {validation.chars_over})"
-                    )
-                    limit_warnings.append(warning)
+                if validation.is_valid:
+                    continue
 
-                    if request.limit_action == LimitAction.ERROR:
-                        raise ValueError(f"Character limit exceeded: {warning}")
-                    elif request.limit_action == LimitAction.TRUNCATE:
-                        all_results[target_locale][field_type] = truncate_to_limit(translated, field_type)
+                if request.limit_action == LimitAction.RETRY:
+                    target_name = get_fastlane_locale_name(target_locale)
+                    field_label = field_type.value.replace("_", " ")
+                    current = translated
+                    current_validation = validation
+                    for _ in range(SHORTEN_MAX_RETRIES):
+                        shorten_prompt = build_shorten_prompt(
+                            translation=current,
+                            field_label=field_label,
+                            target_language=target_name,
+                            limit=current_validation.limit,
+                        )
+                        retried = (await self.translator._call_api(shorten_prompt)).strip()
+                        if retried:
+                            current = retried
+                            current_validation = validate_limit(current, field_type)
+                            if current_validation.is_valid:
+                                break
+
+                    if current_validation.is_valid:
+                        all_results[target_locale][field_type] = current
+                    else:
+                        truncated = truncate_to_limit(current, field_type)
+                        all_results[target_locale][field_type] = truncated
+                        limit_warnings.append(
+                            f"[{target_locale}] {field_type.value}: still over after "
+                            f"{SHORTEN_MAX_RETRIES} retries, truncated to {len(truncated)}/"
+                            f"{current_validation.limit} chars"
+                        )
+                    continue
+
+                warning = (
+                    f"[{target_locale}] {field_type.value}: "
+                    f"{validation.char_count}/{validation.limit} chars "
+                    f"(over by {validation.chars_over})"
+                )
+                limit_warnings.append(warning)
+
+                if request.limit_action == LimitAction.ERROR:
+                    raise ValueError(f"Character limit exceeded: {warning}")
+                elif request.limit_action == LimitAction.TRUNCATE:
+                    all_results[target_locale][field_type] = truncate_to_limit(translated, field_type)
 
         result.limit_warnings = limit_warnings
 

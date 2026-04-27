@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `--on-limit retry` option for `lrx metadata` and `lrx chrome`: when an App Store / Chrome Web Store field overflows its character limit (common for German, Russian, Polish), the model is re-prompted up to 2 times to rewrite the translation shorter while preserving meaning, tone, and structure. Falls back to `truncate` if retries still don't fit. `retry` is now the default action; the previous default (`warn`) remains available explicitly.
+
 ### Fixed
 - Fixed `NameError: name 'asyncio' is not defined` in `lrx metadata` command during non-dry-run translation.
 - Plural translation now produces grammatically correct forms for languages whose CLDR plural system differs from the source. Previously each plural form was translated in isolation against the same source text, so going from English (`one`/`other`) to Russian, Polish, or Arabic produced incorrect or duplicated forms and could leave required CLDR categories missing entirely. The translator now sends all source forms in a single API call together with the target language's CLDR categories and number-range rules, and expands the output to every category the target language requires.

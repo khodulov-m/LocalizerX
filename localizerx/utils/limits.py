@@ -19,6 +19,10 @@ class LimitAction(str, Enum):
     WARN = "warn"  # Show warning but continue
     TRUNCATE = "truncate"  # Auto-truncate to fit limit
     ERROR = "error"  # Stop on limit exceeded
+    RETRY = "retry"  # Re-ask the model to shorten, then truncate as fallback
+
+
+SHORTEN_MAX_RETRIES = 2
 
 
 def _get_limit(field_type: FieldType) -> int:
@@ -137,6 +141,40 @@ def get_limit_for_field(field_type: FieldType) -> int:
         Character limit
     """
     return _get_limit(field_type)
+
+
+def build_shorten_prompt(
+    translation: str,
+    field_label: str,
+    target_language: str,
+    limit: int,
+) -> str:
+    """
+    Build a prompt asking the model to rewrite an over-limit translation shorter.
+
+    Args:
+        translation: The current over-limit translation
+        field_label: Human-readable field name (e.g. "subtitle", "description")
+        target_language: Human-readable target language name
+        limit: Character limit the rewrite must fit within
+
+    Returns:
+        Prompt string for the Gemini API
+    """
+    char_count = len(translation)
+    over = max(0, char_count - limit)
+    return (
+        f"The previous {field_label} translation in {target_language} is "
+        f"{char_count} characters, which is {over} over the {limit}-character "
+        f"hard limit imposed by the store.\n\n"
+        f"Rewrite it shorter. The result MUST be at most {limit} characters. "
+        f"Preserve the original meaning, marketing tone, and any structural "
+        f"elements (commas as separators, line breaks, markdown, emoji, "
+        f"placeholders like __PH_1__). Do not add new information. "
+        f"Return ONLY the rewritten text, no explanations or quotes.\n\n"
+        f"Current translation ({char_count} chars):\n{translation}\n\n"
+        f"Shorter translation (max {limit} chars):"
+    )
 
 
 def format_limit_warning(result: LimitValidationResult, locale: str) -> str:

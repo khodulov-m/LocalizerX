@@ -156,9 +156,9 @@ def metadata(
         str,
         typer.Option(
             "--on-limit",
-            help="Action when translation exceeds character limit: warn, truncate, or error",
+            help="Action when translation exceeds character limit: retry, warn, truncate, or error",
         ),
-    ] = "warn",
+    ] = "retry",
     dry_run: Annotated[
         bool,
         typer.Option(
@@ -219,7 +219,7 @@ def metadata(
         limit_action = LimitAction(on_limit)
     except ValueError:
         console.print(f"[red]Error:[/red] Invalid --on-limit value: {on_limit}")
-        console.print("Valid options: warn, truncate, error")
+        console.print("Valid options: retry, warn, truncate, error")
         raise typer.Exit(1)
 
     # Determine paths to process
