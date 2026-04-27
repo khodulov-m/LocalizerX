@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- App Store `keywords` field is now localized as ASO research, not literal translation. The model is prompted as an ASO expert for the target market with full app context (name, subtitle, promotional text, description) and may drop weak keywords, add high-value local search terms, swap synonyms, and reorder by priority — instead of mechanically translating each source keyword. Keywords are always sent in a separate API call (no longer mixed into the multi-field batch prompt) so the ASO framing is preserved even when other fields are translated in the same run. The 100-character hard limit and comma-separated format are still enforced.
+
 ### Added
 - `--on-limit retry` option for `lrx metadata` and `lrx chrome`: when an App Store / Chrome Web Store field overflows its character limit (common for German, Russian, Polish), the model is re-prompted up to 2 times to rewrite the translation shorter while preserving meaning, tone, and structure. Falls back to `truncate` if retries still don't fit. `retry` is now the default action; the previous default (`warn`) remains available explicitly.
 

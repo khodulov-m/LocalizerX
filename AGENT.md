@@ -42,6 +42,7 @@ lrx delete <path> fr,de --backup
 ### App Store Metadata (Fastlane)
 ```bash
 # Translate App Store metadata text files
+# Keywords are localized as ASO research (locale-specific search terms, not literal translation)
 lrx metadata --to fr-FR,de-DE
 
 # Show info about metadata files

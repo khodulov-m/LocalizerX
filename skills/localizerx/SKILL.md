@@ -44,7 +44,7 @@ lrx delete Localizable.xcstrings fr,de --backup
 
 ### App Store Metadata (Fastlane)
 
-Translates App Store metadata text files (`name.txt`, `subtitle.txt`, etc.). Automatically detects both iOS (`fastlane/metadata`) and macOS (`fastlane/metadata_macos`) directories.
+Translates App Store metadata text files (`name.txt`, `subtitle.txt`, etc.). Automatically detects both iOS (`fastlane/metadata`) and macOS (`fastlane/metadata_macos`) directories. The `keywords` field is localized as ASO research using full app context (name, subtitle, description) — the model picks locale-appropriate search terms rather than translating word-by-word.
 
 ```bash
 # Translate metadata

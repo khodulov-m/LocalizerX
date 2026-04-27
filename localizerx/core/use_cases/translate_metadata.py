@@ -6,13 +6,16 @@ from pathlib import Path
 from typing import Any, Callable
 
 from localizerx.core.ports.repository import CatalogRepository
+from localizerx.parser.app_context import AppContext
 from localizerx.parser.metadata_model import MetadataCatalog, MetadataFieldType
 from localizerx.translator.base import TranslationRequest, Translator
+
 
 @dataclass
 class MetadataTranslationTask:
     locale: str
     field_types: list[MetadataFieldType] = field(default_factory=list)
+
 
 from localizerx.utils.limits import (
     SHORTEN_MAX_RETRIES,
@@ -21,6 +24,7 @@ from localizerx.utils.limits import (
     truncate_to_limit,
     validate_limit,
 )
+
 
 @dataclass
 class TranslateMetadataRequest:
@@ -34,6 +38,7 @@ class TranslateMetadataRequest:
     limit_action: LimitAction = LimitAction.WARN
     backup: bool = False
 
+
 @dataclass
 class MetadataTranslationPreview:
     locale: str
@@ -43,12 +48,14 @@ class MetadataTranslationPreview:
     limit: int = 0
     is_over_limit: bool = False
 
+
 @dataclass
 class TranslateMetadataResult:
     tasks: dict[str, MetadataTranslationTask] = field(default_factory=dict)
     preview_items: list[MetadataTranslationPreview] = field(default_factory=list)
     limit_warnings: list[str] = field(default_factory=list)
     saved: bool = False
+
 
 class TranslateMetadataUseCase:
     """Orchestrates the translation of App Store metadata."""
@@ -72,21 +79,21 @@ class TranslateMetadataUseCase:
             build_metadata_prompt,
             parse_batch_metadata_response,
         )
-        
+
         catalog = self.repository.read(request.path, source_locale=request.source_locale)
-        
+
         tasks = {}
         for target_locale in request.target_locales:
             fields = catalog.get_fields_needing_translation(
-                target_locale, 
-                field_types=request.field_types,
-                overwrite=request.overwrite
+                target_locale, field_types=request.field_types, overwrite=request.overwrite
             )
             if fields:
-                tasks[target_locale] = MetadataTranslationTask(locale=target_locale, field_types=fields)
+                tasks[target_locale] = MetadataTranslationTask(
+                    locale=target_locale, field_types=fields
+                )
 
         result = TranslateMetadataResult(tasks=tasks)
-        
+
         if not tasks:
             return result
 
@@ -96,54 +103,77 @@ class TranslateMetadataUseCase:
         if request.dry_run:
             return result
 
-        all_results = {} # locale -> {field_type: translation}
+        all_results = {}  # locale -> {field_type: translation}
         limit_warnings = []
         source_meta = catalog.get_source_metadata()
+        app_context = AppContext.from_metadata(source_meta) if source_meta else None
 
         semaphore = asyncio.Semaphore(5)
 
-        async def _translate_locale(target_locale: str, field_types: list[MetadataFieldType]) -> dict[MetadataFieldType, str]:
+        async def _translate_locale(
+            target_locale: str, field_types: list[MetadataFieldType]
+        ) -> dict[MetadataFieldType, str]:
             async with semaphore:
-                items: list[tuple[MetadataFieldType, str]] = []
+                keyword_item: tuple[MetadataFieldType, str] | None = None
+                batch_items: list[tuple[MetadataFieldType, str]] = []
                 for ft in field_types:
                     f = source_meta.get_field(ft)
-                    if f:
-                        items.append((ft, f.content))
+                    if not f:
+                        continue
+                    if ft == MetadataFieldType.KEYWORDS:
+                        keyword_item = (ft, f.content)
+                    else:
+                        batch_items.append((ft, f.content))
 
-                if not items:
+                total = (1 if keyword_item else 0) + len(batch_items)
+                if total == 0:
                     return {}
 
-                task_id = on_translation_start(target_locale, len(items)) if on_translation_start else None
+                task_id = (
+                    on_translation_start(target_locale, total) if on_translation_start else None
+                )
 
-                res_dict = {}
-                if len(items) == 1:
-                    ft, text = items[0]
-                    if ft == MetadataFieldType.KEYWORDS:
-                        prompt = build_keywords_prompt(text, request.source_locale, target_locale)
-                    else:
-                        prompt = build_metadata_prompt(text, ft, request.source_locale, target_locale)
-                    
+                res_dict: dict[MetadataFieldType, str] = {}
+
+                if keyword_item:
+                    ft, text = keyword_item
+                    prompt = build_keywords_prompt(
+                        text,
+                        request.source_locale,
+                        target_locale,
+                        app_context=app_context,
+                    )
                     translated = await self.translator._call_api(prompt)
                     res_dict[ft] = translated.strip()
                     if on_translation_progress and task_id:
                         on_translation_progress(task_id, 1)
-                else:
-                    prompt = build_batch_metadata_prompt(items, request.source_locale, target_locale)
-                    response = await self.translator._call_api(prompt)
-                    translations = parse_batch_metadata_response(response, len(items))
 
-                    for (ft, _), translated in zip(items, translations):
+                if len(batch_items) == 1:
+                    ft, text = batch_items[0]
+                    prompt = build_metadata_prompt(text, ft, request.source_locale, target_locale)
+                    translated = await self.translator._call_api(prompt)
+                    res_dict[ft] = translated.strip()
+                    if on_translation_progress and task_id:
+                        on_translation_progress(task_id, 1)
+                elif len(batch_items) > 1:
+                    prompt = build_batch_metadata_prompt(
+                        batch_items, request.source_locale, target_locale
+                    )
+                    response = await self.translator._call_api(prompt)
+                    translations = parse_batch_metadata_response(response, len(batch_items))
+
+                    for (ft, _), translated in zip(batch_items, translations):
                         if translated:
                             res_dict[ft] = translated
                         if on_translation_progress and task_id:
                             on_translation_progress(task_id, 1)
-                
+
                 return res_dict
 
         # Run locales concurrently
         locale_results = await asyncio.gather(
             *[_translate_locale(loc, t.field_types) for loc, t in tasks.items()],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         for loc, res in zip(tasks.keys(), locale_results):
@@ -202,7 +232,9 @@ class TranslateMetadataUseCase:
                 if request.limit_action == LimitAction.ERROR:
                     raise ValueError(f"Character limit exceeded: {warning}")
                 elif request.limit_action == LimitAction.TRUNCATE:
-                    all_results[target_locale][field_type] = truncate_to_limit(translated, field_type)
+                    all_results[target_locale][field_type] = truncate_to_limit(
+                        translated, field_type
+                    )
 
         result.limit_warnings = limit_warnings
 
@@ -211,15 +243,17 @@ class TranslateMetadataUseCase:
             for locale, res in all_results.items():
                 for field_type, value in res.items():
                     validation = validate_limit(value, field_type)
-                    preview_items.append(MetadataTranslationPreview(
-                        locale=locale, 
-                        field_type=field_type, 
-                        translation=value,
-                        chars=validation.char_count,
-                        limit=validation.limit,
-                        is_over_limit=not validation.is_valid
-                    ))
-            
+                    preview_items.append(
+                        MetadataTranslationPreview(
+                            locale=locale,
+                            field_type=field_type,
+                            translation=value,
+                            chars=validation.char_count,
+                            limit=validation.limit,
+                            is_over_limit=not validation.is_valid,
+                        )
+                    )
+
             if not on_preview_request(preview_items):
                 return result
 
@@ -231,9 +265,10 @@ class TranslateMetadataUseCase:
 
         # Save
         self.repository.write(catalog, request.path)
-        
+
         # Copy untranslatable files
         import shutil
+
         untranslatable_files = [
             "marketing_url.txt",
             "privacy_url.txt",

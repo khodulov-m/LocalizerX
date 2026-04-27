@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from localizerx.parser.app_context import AppContext
 from localizerx.parser.metadata_model import FIELD_LIMITS, MetadataFieldType
 from localizerx.utils.locale import get_fastlane_locale_name
 
@@ -122,17 +123,21 @@ def build_keywords_prompt(
     keywords: str,
     src_lang: str,
     tgt_lang: str,
+    app_context: AppContext | None = None,
 ) -> str:
     """
-    Build a specialized prompt for translating App Store keywords.
+    Build an ASO-aware prompt for localizing App Store keywords.
 
-    Keywords require special handling to preserve the comma-separated format
-    and ensure each keyword is translated individually.
+    Frames the task as locale-specific ASO research rather than literal
+    translation. The model is encouraged to drop weak keywords, add
+    high-value local search terms, reorder by priority, and fully use
+    the 100-character budget for the target market.
 
     Args:
-        keywords: Comma-separated keywords string
+        keywords: Comma-separated source keywords string
         src_lang: Source language code
         tgt_lang: Target language code
+        app_context: Optional app metadata to ground keyword choices
 
     Returns:
         Formatted prompt string for the Gemini API
@@ -141,28 +146,30 @@ def build_keywords_prompt(
     tgt_name = get_fastlane_locale_name(tgt_lang)
     limit = FIELD_LIMITS[MetadataFieldType.KEYWORDS]
 
-    # Split keywords for clarity
-    keyword_list = [k.strip() for k in keywords.split(",")]
-    keyword_count = len(keyword_list)
+    context_block = ""
+    if app_context is not None:
+        context_block = f"""
+APP CONTEXT:
+{app_context.to_prompt_context()}
+"""
 
-    prompt = f"""Translate these {keyword_count} App Store keywords from {src_name} to {tgt_name}.
+    prompt = f"""You are an ASO (App Store Optimization) expert localizing App Store keywords for the {tgt_name} market.
 
-CHARACTER LIMIT: {limit} characters total for all keywords combined.
-
-CURRENT KEYWORDS (separated by commas):
+Your job is NOT to translate word-for-word. Native {tgt_name} users may search for this app with completely different terms than {src_name} users. Research how the target audience actually searches, then produce the strongest keyword set for the {tgt_name} App Store.
+{context_block}
+SOURCE KEYWORDS ({src_name}, for reference only — feel free to deviate):
 {keywords}
 
-TRANSLATION RULES:
-1. Translate each keyword individually
-2. Keep the same comma-separated format
-3. Do NOT add or remove keywords
-4. Total length must be under {limit} characters
-5. No spaces after commas
-6. Keywords should be relevant search terms in {tgt_name}
+ASO RULES:
+1. Act as a {tgt_name}-market ASO expert, not a translator. Pick the keywords real users in this locale actually type.
+2. You MAY drop weak/irrelevant keywords, add high-value local search terms, swap synonyms, and reorder by priority. The number of keywords does not need to match the source.
+3. HARD LIMIT: total length MUST be at most {limit} characters (including commas). Aim to use the budget efficiently — not too short, never over.
+4. Format: comma-separated, no spaces after commas. Example: keyword1,keyword2,keyword3
+5. Avoid duplicating words already in the app name (App Store indexes the name separately — don't waste budget).
+6. No competitor brand names or trademarks. Only legitimate, high-intent search terms for this app's category in {tgt_name}.
+7. Single words preferred over multi-word phrases (App Store recombines keywords automatically).
 
-Example format: keyword1,keyword2,keyword3
-
-Translated keywords (comma-separated, max {limit} chars):"""
+Output ONLY the final comma-separated keyword string for {tgt_name}, nothing else (max {limit} chars):"""
 
     return prompt
 
@@ -204,7 +211,6 @@ def build_batch_metadata_prompt(
 IMPORTANT RULES:
 - Each field has a CHARACTER LIMIT that MUST be respected
 - Translate naturally, preserving the marketing tone
-- For KEYWORDS: Keep comma-separated format exactly, same number of keywords, no spaces after commas
 - Return translations using the EXACT SAME <<ITEM_N>> markers
 - Do NOT include field labels like [NAME] in your response — only the translated text inside each marker
 
