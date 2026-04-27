@@ -43,15 +43,45 @@ CHROME_NAMED_PLACEHOLDER_PATTERN = r"\$[a-zA-Z_][a-zA-Z0-9_]*\$"
 # $1-style positional placeholders (e.g., $1, $2)
 CHROME_POSITIONAL_PLACEHOLDER_PATTERN = r"\$\d+"
 
-# Combine all patterns (order matters: more specific patterns first)
-ALL_PATTERNS = PRINTF_PATTERNS + [
-    DOUBLE_BRACE_PLACEHOLDER_PATTERN,
-    POSITIONAL_BRACE_PATTERN,
-    NAMED_PLACEHOLDER_PATTERN,
-    CHROME_NAMED_PLACEHOLDER_PATTERN,
-    CHROME_POSITIONAL_PLACEHOLDER_PATTERN,
-]
-COMBINED_PATTERN = re.compile("|".join(f"({p})" for p in ALL_PATTERNS))
+# CDATA blocks (Android strings.xml): <![CDATA[...]]>
+# Match non-greedily so multiple CDATA sections in one string don't merge.
+CDATA_PATTERN = r"<!\[CDATA\[.*?\]\]>"
+
+# HTML/XML tags. Matches well-formed open/close/self-closing tags with a real
+# tag name, e.g. <b>, </a>, <br/>, <a href="...">. Avoids matching stray '<'
+# characters in user content (e.g., "5 < 10" or "<3").
+HTML_TAG_PATTERN = (
+    r"</?[a-zA-Z][a-zA-Z0-9]*"  # tag name, optionally with leading slash
+    r"(?:\s+[a-zA-Z_:][-a-zA-Z0-9_:.]*"  # optional attribute name
+    r"(?:\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+))?)*"  # optional attribute value
+    r"\s*/?>"  # optional self-closing slash and closing bracket
+)
+
+# Markdown link URL: the (url) part of [text](url). Only the URL is masked
+# so the visible link text stays translatable.
+MARKDOWN_LINK_URL_PATTERN = r"(?<=\])\((?:[^)\s][^)]*?)\)"
+
+# Escape sequences common in Android strings.xml and JSON-style i18n files.
+# Matches \\n, \\t, \\r, \\", \\', \\\\, \\u00A0 and similar.
+ESCAPE_SEQUENCE_PATTERN = r"\\(?:u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[ntr\"'\\@?])"
+
+# Combine all patterns (order matters: more specific patterns first).
+# CDATA must come before HTML tags so it isn't partially matched.
+ALL_PATTERNS = (
+    [CDATA_PATTERN]
+    + PRINTF_PATTERNS
+    + [
+        HTML_TAG_PATTERN,
+        DOUBLE_BRACE_PLACEHOLDER_PATTERN,
+        POSITIONAL_BRACE_PATTERN,
+        NAMED_PLACEHOLDER_PATTERN,
+        CHROME_NAMED_PLACEHOLDER_PATTERN,
+        CHROME_POSITIONAL_PLACEHOLDER_PATTERN,
+        MARKDOWN_LINK_URL_PATTERN,
+        ESCAPE_SEQUENCE_PATTERN,
+    ]
+)
+COMBINED_PATTERN = re.compile("|".join(f"({p})" for p in ALL_PATTERNS), re.DOTALL)
 
 
 def mask_placeholders(text: str) -> MaskedText:

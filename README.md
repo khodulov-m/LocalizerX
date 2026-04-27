@@ -17,9 +17,9 @@ Whether you're building a macOS app, a Chrome extension, or a web project, we've
 - **🤖 AI Agent Ready:** Comes with a standard Agent Skill (`use-localizerx`) for Claude Code and Gemini CLI—let your AI agents translate your project autonomously!
 - **📦 Multi-Format Support:** Translate `.xcstrings`, fastlane metadata, Chrome Extensions, frontend JSONs, and Android `strings.xml`.
 - **🚀 ASO-Optimized:** Generate and translate App Store screenshot texts with marketing-focused prompts designed to boost your store presence.
-- **🛡️ Safe & Smart:** Automatically preserves placeholders (`%@`, `{name}`, etc.) and respects developer comments for context.
+- **🛡️ Safe & Smart:** Automatically preserves placeholders (`%@`, `{name}`, `$1`, …), HTML/CDATA markup, escape sequences, and Markdown link URLs; respects developer comments for context.
 - **⚡ Fast & Efficient:** Uses SQLite caching to avoid redundant API calls and save you money.
-- **🛠️ Flexible:** Supports pluralization, declension forms, and character limit enforcement.
+- **🛠️ Flexible:** Supports CLDR-aware pluralization (expands English `one`/`other` into the full set of categories required by Russian, Arabic, Polish, …), declension forms, and character limit enforcement.
 
 ---
 

@@ -59,18 +59,20 @@ class TestGeminiAdapterAppContext:
         translator = GeminiTranslator(api_key="fake-key", app_context="- App Name: PluralApp")
 
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
-            mock_api.return_value = "Hola"
+            mock_api.return_value = '{"one": "x", "other": "y"}'
 
-            plural_forms = {"other": "%d items"}
+            plural_forms = {"one": "%d item", "other": "%d items"}
             await translator._translate_plural_forms(plural_forms, "en", "es")
 
-            # Get the prompt that was sent to the API
             mock_api.assert_called_once()
             prompt = mock_api.call_args[0][0]
 
             assert "App Context:" in prompt
             assert "- App Name: PluralApp" in prompt
-            assert "Text to translate (other form):\n__PH_1__ items" in prompt
+            # New CLDR-aware prompt presents source forms in a JSON block.
+            assert "SOURCE FORMS" in prompt
+            assert "__PH_1__ items" in prompt
+            assert "CLDR plural categories" in prompt
 
     @pytest.mark.asyncio
     async def test_plural_translation_prompt_without_app_context(self):
@@ -78,13 +80,14 @@ class TestGeminiAdapterAppContext:
         translator = GeminiTranslator(api_key="fake-key", app_context=None)
 
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
-            mock_api.return_value = "Hola"
+            mock_api.return_value = '{"one": "x", "other": "y"}'
 
-            plural_forms = {"other": "%d items"}
+            plural_forms = {"one": "%d item", "other": "%d items"}
             await translator._translate_plural_forms(plural_forms, "en", "es")
 
             mock_api.assert_called_once()
             prompt = mock_api.call_args[0][0]
 
             assert "App Context:" not in prompt
-            assert "Text to translate (other form):\n__PH_1__ items" in prompt
+            assert "SOURCE FORMS" in prompt
+            assert "__PH_1__ items" in prompt

@@ -6,9 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Fixed `NameError: name 'asyncio' is not defined` in `lrx metadata` command during non-dry-run translation.
+- Plural translation now produces grammatically correct forms for languages whose CLDR plural system differs from the source. Previously each plural form was translated in isolation against the same source text, so going from English (`one`/`other`) to Russian, Polish, or Arabic produced incorrect or duplicated forms and could leave required CLDR categories missing entirely. The translator now sends all source forms in a single API call together with the target language's CLDR categories and number-range rules, and expands the output to every category the target language requires.
+- Android `<plurals>` translation now uses the same CLDR-aware path instead of treating each `<item quantity="...">` as an unrelated string, so target languages get all their required quantity entries even when the source provides only `one` and `other`.
+- Plural-translation cache key now includes the developer comment, custom instructions, and app context. Previously a cached plural translation could be reused even after the user changed their custom instructions or the surrounding context.
 
 ### Added
 - Comprehensive test suite for metadata translation scenarios, covering character limits (warn/truncate/error), interactive previews, overwrite behavior, and untranslatable file copying.
+- `localizerx/utils/plural_rules.py`: CLDR plural categories and number-range descriptions for ~50 languages (Slavic four-form, Arabic six-form, French/Brazilian Portuguese three-form, single-form CJK, etc.), used to build plural-translation prompts.
+- Placeholder masking now also protects HTML/XML tags, `<![CDATA[...]]>` blocks, common backslash escape sequences (`\n`, `\t`, `\u00A0`, ...), and the URL portion of Markdown links (`[text](url)` — the link text stays translatable). This prevents the model from rewriting Android rich-text markup, JSON escapes, and link targets.
 
 ## [0.1.2] - 2026-03-21
 

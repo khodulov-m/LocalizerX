@@ -137,16 +137,27 @@ class TranslateAndroidUseCase:
                 if on_translation_progress and task_id:
                     on_translation_progress(task_id, 1)
 
-            # Translate plurals
+            # Translate plurals — send the whole quantity dict as one CLDR-aware
+            # request so the translator can expand source forms (e.g. en's
+            # one/other) into the full set of target categories (ru's
+            # one/few/many/other, ar's six categories, etc.).
             for plural in task.plurals:
-                reqs = [TranslationRequest(key=f"{plural.name}:{qty}", text=text) for qty, text in plural.items.items()]
-                batch_results = await self.translator.translate_batch(reqs, request.source_locale, locale)
-                translated_items = {}
-                for res in batch_results:
-                    if res.success and res.translated:
-                        qty = res.key.split(":")[1]
-                        translated_items[qty] = res.translated
-                all_results[locale]["plurals"][plural.name] = translated_items
+                if not plural.items:
+                    continue
+                fallback_text = plural.items.get("other") or next(iter(plural.items.values()))
+                req = TranslationRequest(
+                    key=plural.name,
+                    text=fallback_text,
+                    comment=plural.comment,
+                    plural_forms=dict(plural.items),
+                )
+                batch_results = await self.translator.translate_batch(
+                    [req], request.source_locale, locale
+                )
+                if batch_results and batch_results[0].translated_plurals:
+                    all_results[locale]["plurals"][plural.name] = (
+                        batch_results[0].translated_plurals
+                    )
                 if on_translation_progress and task_id:
                     on_translation_progress(task_id, 1)
 

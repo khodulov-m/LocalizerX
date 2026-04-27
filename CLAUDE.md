@@ -98,7 +98,8 @@ CLI (Typer)  [localizerx/cli/]
 - `localizerx/translator/frameit_prompts.py` - Prompts for Frameit title/keyword strings
 - `localizerx/translator/screenshots_prompts.py` - ASO-optimized prompts for screenshot text translation
 - `localizerx/translator/screenshots_generation_prompts.py` - ASO-optimized prompts for screenshot text generation
-- `localizerx/utils/placeholders.py` - Placeholder masking/unmasking (%@, %d, {name}, $NAME$, $1)
+- `localizerx/utils/placeholders.py` - Placeholder masking/unmasking (%@, %d, {name}, $NAME$, $1, HTML/XML tags, CDATA, escape sequences, Markdown link URLs)
+- `localizerx/utils/plural_rules.py` - CLDR plural categories and number-range rules per language (drives plural-translation prompts)
 - `localizerx/utils/locale.py` - Language/locale mapping
 - `localizerx/utils/limits.py` - Character limit validation (App Store + Chrome Web Store)
 - `localizerx/utils/context.py` - App context extraction (from metadata, workspace, project)
@@ -107,8 +108,9 @@ CLI (Typer)  [localizerx/cli/]
 
 - **Lossless parsing**: `read → write` must preserve structure exactly, only adding translations
 - **Translator abstraction**: Provider-agnostic interface allows swapping Gemini for other APIs
-- **Placeholder masking**: Mask placeholders before translation (`%@` → `__PH_1__`, `$NAME$` → `__PH_1__`), restore after
-- **SQLite caching**: Key is `(src_lang, tgt_lang, text_hash)` to avoid redundant API calls
+- **Placeholder masking**: Mask placeholders, HTML/CDATA, escape sequences, and Markdown link URLs before translation (`%@` → `__PH_1__`, `<b>` → `__PH_2__`, …), restore after
+- **CLDR-aware plurals**: For xcstrings and Android `<plurals>`, the translator sends all source forms in one API call along with the target language's CLDR categories and number-range rules, so it can emit every required category (e.g. expand English `one`/`other` to Russian `one`/`few`/`many`/`other`)
+- **SQLite caching**: Translations are cached locally to avoid redundant API calls. Plural cache keys additionally include the developer comment, custom instructions, and app context
 - **Custom instructions**: Support for custom translation rules via `--custom-prompt` CLI option or `custom_instructions` config field
 
 ### Data Models

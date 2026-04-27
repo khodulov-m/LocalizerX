@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -14,6 +16,11 @@ import httpx
 from localizerx.config import DEFAULT_MODEL
 from localizerx.utils.locale import get_language_name
 from localizerx.utils.placeholders import mask_placeholders, unmask_placeholders
+from localizerx.utils.plural_rules import (
+    expand_source_forms,
+    get_plural_categories,
+    get_plural_rules_text,
+)
 
 from .base import TranslationRequest, TranslationResult, Translator
 
@@ -32,6 +39,60 @@ def _preserve_whitespace(original: str, translated: str) -> str:
 
     # Apply to translated text (strip it first to ensure clean result)
     return leading_ws + translated.strip() + trailing_ws
+
+
+def _mask_with_shared_map(text: str, shared: dict[str, str]) -> str:
+    """Mask placeholders in ``text`` reusing tokens already in ``shared``.
+
+    Mutates ``shared`` to add new placeholder→token mappings. Identical
+    placeholders across multiple plural forms thus get identical tokens,
+    keeping the model's output consistent.
+    """
+    masked = mask_placeholders(text)
+    # Re-map this form's tokens to a stable token per original placeholder.
+    reverse: dict[str, str] = {orig: tok for tok, orig in shared.items()}
+    result = masked.masked
+    for tok, orig in masked.placeholders.items():
+        if orig in reverse:
+            shared_tok = reverse[orig]
+            if shared_tok != tok:
+                result = result.replace(tok, shared_tok)
+        else:
+            new_tok = f"__PH_{len(shared) + 1}__"
+            shared[new_tok] = orig
+            reverse[orig] = new_tok
+            if new_tok != tok:
+                result = result.replace(tok, new_tok)
+    return result
+
+
+def _extract_first_json_object(text: str) -> str | None:
+    """Extract the first balanced ``{...}`` substring from ``text``."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
 
 
 class GeminiTranslator(Translator):
@@ -120,62 +181,183 @@ class GeminiTranslator(Translator):
         plural_forms: dict[str, str],
         source_lang: str,
         target_lang: str,
+        comment: str | None = None,
     ) -> dict[str, str]:
-        """Translate plural forms (zero, one, two, few, many, other)."""
-        src_name = get_language_name(source_lang)
-        tgt_name = get_language_name(target_lang)
+        """Translate plural forms using CLDR rules of the target language.
 
-        # Translate each form
-        translated_forms = {}
+        Sends ALL source forms in a single API call together with the list of
+        CLDR categories required by the target language and a description of
+        which numbers map to each category. This lets the model produce
+        grammatically correct forms for languages like Russian (one/few/many/
+        other) or Arabic (zero/one/two/few/many/other) even when the source
+        only provides ``one``/``other``.
+        """
+        # Source forms might lack 'other' for languages with no plural — duplicate.
+        plural_forms = expand_source_forms(plural_forms)
+
+        target_categories = get_plural_categories(target_lang)
+
+        # Cache check: only return cached if every required target category is present.
+        cache_key = self._plural_cache_key(plural_forms, target_categories, comment)
+        cached_blob = self._get_cached(cache_key, source_lang, target_lang)
+        if cached_blob:
+            try:
+                cached_forms = json.loads(cached_blob)
+                if isinstance(cached_forms, dict) and all(
+                    cat in cached_forms for cat in target_categories
+                ):
+                    return {cat: cached_forms[cat] for cat in target_categories}
+            except (ValueError, TypeError):
+                pass
+
+        # Mask placeholders in every source form, sharing one placeholder map
+        # so the same placeholder receives the same token across forms.
+        shared_placeholders: dict[str, str] = {}
+        masked_forms: dict[str, str] = {}
         for form_name, form_text in plural_forms.items():
-            # Check cache
-            cache_key = f"plural:{form_name}:{form_text}"
-            cached = self._get_cached(cache_key, source_lang, target_lang)
-            if cached:
-                translated_forms[form_name] = cached
-                continue
+            masked_forms[form_name] = _mask_with_shared_map(form_text, shared_placeholders)
 
-            # Mask placeholders
-            masked = mask_placeholders(form_text)
+        prompt = self._build_plural_prompt(
+            masked_forms,
+            source_lang,
+            target_lang,
+            target_categories,
+            comment,
+        )
 
-            # Build prompt with plural context
-            prompt = f"""Translate the following {form_name} form of a plural string from {src_name} to {tgt_name}.
+        response = await self._call_api(prompt)
+        parsed = self._parse_plural_response(response, target_categories)
 
-IMPORTANT RULES:
-1. Keep all placeholders exactly as they are (like __PH_1__, __PH_2__, etc.)
-2. Preserve any formatting and punctuation style
-3. This is the "{form_name}" plural form (e.g., "one" = singular, "other" = plural)
-4. Translate appropriately for this plural form in {tgt_name}
-5. This is for an iOS/macOS app interface"""
+        # Unmask placeholders, preserve whitespace using the closest source form.
+        translated_forms: dict[str, str] = {}
+        for category in target_categories:
+            translated = parsed.get(category, "")
+            if not translated:
+                # Fallback to source form so the file stays valid.
+                translated = plural_forms.get(category) or plural_forms.get("other", "")
+            else:
+                translated = unmask_placeholders(translated, shared_placeholders)
+                # Use 'other' or matching source form as the whitespace template.
+                template = plural_forms.get(category) or plural_forms.get("other", "")
+                if template:
+                    translated = _preserve_whitespace(template, translated)
+            translated_forms[category] = translated
 
-            if self.custom_instructions:
-                prompt += f"\n6. {self.custom_instructions}"
-
-            if self.app_context:
-                prompt += f"\n\nApp Context:\n{self.app_context}"
-
-            prompt += f"""
-
-Text to translate ({form_name} form):
-{masked.masked}
-
-Translation (only provide the translated text, nothing else):"""
-
-            # Call API
-            translated_masked = await self._call_api(prompt)
-
-            # Unmask placeholders
-            translated = unmask_placeholders(translated_masked, masked.placeholders)
-
-            # Preserve whitespace
-            translated = _preserve_whitespace(form_text, translated)
-
-            # Cache result
-            self._set_cached(cache_key, translated, source_lang, target_lang)
-
-            translated_forms[form_name] = translated
+        # Cache the full set under a single key.
+        self._set_cached(
+            cache_key,
+            json.dumps(translated_forms, ensure_ascii=False),
+            source_lang,
+            target_lang,
+        )
 
         return translated_forms
+
+    def _plural_cache_key(
+        self,
+        plural_forms: dict[str, str],
+        target_categories: list[str],
+        comment: str | None,
+    ) -> str:
+        """Build a deterministic cache key for a plural translation request."""
+        payload = {
+            "forms": plural_forms,
+            "categories": target_categories,
+            "comment": comment or "",
+            "instructions": self.custom_instructions or "",
+            "context": self.app_context or "",
+        }
+        return "plural:" + json.dumps(payload, sort_keys=True, ensure_ascii=False)
+
+    def _build_plural_prompt(
+        self,
+        masked_forms: dict[str, str],
+        source_lang: str,
+        target_lang: str,
+        target_categories: list[str],
+        comment: str | None,
+    ) -> str:
+        """Build the prompt for translating plural forms with CLDR awareness."""
+        src_name = get_language_name(source_lang)
+        tgt_name = get_language_name(target_lang)
+        rules = get_plural_rules_text(target_lang)
+
+        source_block = "\n".join(
+            f'  "{form}": {json.dumps(text, ensure_ascii=False)}'
+            for form, text in masked_forms.items()
+        )
+        categories_list = ", ".join(target_categories)
+
+        prompt = f"""You are translating a plural string from {src_name} to {tgt_name}.
+
+The target language {tgt_name} uses the following CLDR plural categories:
+{categories_list}
+
+CLDR rules for {tgt_name} (which numbers map to each category):
+{rules}
+
+SOURCE FORMS (in {src_name}):
+{source_block}
+
+CRITICAL RULES:
+1. Produce ONE translation for EVERY required target category: {categories_list}.
+2. Each translation must be grammatically correct for the numbers that fall
+   into that category in {tgt_name} (correct case endings, agreement, etc.).
+3. Keep ALL placeholders (like __PH_1__, __PH_2__) exactly as written —
+   never translate, remove, reorder, or alter them.
+4. Preserve formatting, line breaks and punctuation style of the source.
+5. The translations must be CONSISTENT with each other (same noun stem,
+   same tone, same register). Only the grammatical form should differ.
+6. Do NOT add, remove, or merge categories. Output exactly: {categories_list}.
+7. This is for an iOS/macOS/Android app UI — keep it natural and concise."""
+
+        if comment:
+            prompt += f"\n\nDeveloper note (context for the string): {comment}"
+        if self.custom_instructions:
+            prompt += f"\n\nAdditional instructions: {self.custom_instructions}"
+        if self.app_context:
+            prompt += f"\n\nApp Context:\n{self.app_context}"
+
+        prompt += (
+            "\n\nReturn ONLY a JSON object mapping each target category to its"
+            " translation, with no extra text, no markdown fences, no comments."
+            " Example shape:\n"
+        )
+        example = {cat: f"<translation for {cat}>" for cat in target_categories}
+        prompt += json.dumps(example, ensure_ascii=False, indent=2)
+        return prompt
+
+    def _parse_plural_response(
+        self,
+        response: str,
+        target_categories: list[str],
+    ) -> dict[str, str]:
+        """Parse the JSON object returned by the plural prompt.
+
+        Tolerates ```json fences and extra text before/after the object.
+        """
+        text = response.strip()
+
+        # Strip code fences if present.
+        if text.startswith("```"):
+            text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
+            text = re.sub(r"\s*```$", "", text)
+
+        # Try direct JSON parse first.
+        for candidate in (text, _extract_first_json_object(text)):
+            if not candidate:
+                continue
+            try:
+                data = json.loads(candidate)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(data, dict):
+                return {
+                    cat: str(data[cat])
+                    for cat in target_categories
+                    if cat in data and isinstance(data[cat], (str, int, float))
+                }
+        return {}
 
     async def translate_text(
         self,
@@ -227,9 +409,11 @@ Translation (only provide the translated text, nothing else):"""
         for i, req in enumerate(requests):
             # Handle plural forms separately
             if req.plural_forms:
-                # Translate each plural form
                 translated_plurals = await self._translate_plural_forms(
-                    req.plural_forms, source_lang, target_lang
+                    req.plural_forms,
+                    source_lang,
+                    target_lang,
+                    comment=req.comment,
                 )
                 results.append(
                     TranslationResult(

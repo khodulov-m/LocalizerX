@@ -188,3 +188,78 @@ class TestPositionalBracePlaceholders:
         assert len(result.placeholders) == 2
         assert "{{greeting}}" in result.placeholders.values()
         assert "{0}" in result.placeholders.values()
+
+
+class TestHtmlTagMasking:
+    def test_mask_simple_tags(self):
+        result = mask_placeholders("Click <b>here</b> to continue")
+        assert "<b>" in result.placeholders.values()
+        assert "</b>" in result.placeholders.values()
+        assert "here" in result.masked
+        assert "Click" in result.masked
+
+    def test_mask_self_closing_tag(self):
+        result = mask_placeholders("Line one<br/>Line two")
+        assert "<br/>" in result.placeholders.values()
+
+    def test_mask_tag_with_attributes(self):
+        result = mask_placeholders('Visit <a href="https://example.com">our site</a>')
+        values = list(result.placeholders.values())
+        assert any('<a href="https://example.com">' == v for v in values)
+        assert "</a>" in values
+
+    def test_does_not_match_stray_lt(self):
+        result = mask_placeholders("Use <3 for love and 5 < 10 in math")
+        assert result.placeholders == {}
+
+    def test_round_trip_with_tags(self):
+        original = "Use <b>%@</b> wisely"
+        masked = mask_placeholders(original)
+        restored = unmask_placeholders(masked.masked, masked.placeholders)
+        assert restored == original
+
+
+class TestCdataMasking:
+    def test_mask_cdata(self):
+        result = mask_placeholders("<![CDATA[<b>Hello</b>]]>")
+        assert "<![CDATA[<b>Hello</b>]]>" in result.placeholders.values()
+        # The inner <b> tags must NOT also be masked (CDATA is opaque).
+        assert len(result.placeholders) == 1
+
+    def test_validate_cdata_preserved(self):
+        original = "<![CDATA[some & stuff]]>"
+        translated = "<![CDATA[some & stuff]]>"
+        assert validate_placeholders(original, translated) is True
+
+
+class TestEscapeSequenceMasking:
+    def test_mask_newline_escape(self):
+        result = mask_placeholders(r"First line\nSecond line")
+        assert r"\n" in result.placeholders.values()
+
+    def test_mask_unicode_escape(self):
+        result = mask_placeholders(r"Hello\u00A0world")
+        assert r"\u00A0" in result.placeholders.values()
+
+    def test_mask_quoted_escape(self):
+        result = mask_placeholders(r"It\'s great")
+        assert r"\'" in result.placeholders.values()
+
+    def test_round_trip_escapes(self):
+        original = r"Press \"OK\"\nthen continue"
+        masked = mask_placeholders(original)
+        restored = unmask_placeholders(masked.masked, masked.placeholders)
+        assert restored == original
+
+
+class TestMarkdownLinkMasking:
+    def test_mask_link_url_only(self):
+        result = mask_placeholders("Read the [docs](https://example.com/docs)")
+        # URL is masked, link text stays translatable.
+        assert "(https://example.com/docs)" in result.placeholders.values()
+        assert "[docs]" in result.masked
+
+    def test_mask_does_not_break_plain_parens(self):
+        result = mask_placeholders("Buy now (limited offer)")
+        # No preceding ']', so the parens should not be masked.
+        assert result.placeholders == {}

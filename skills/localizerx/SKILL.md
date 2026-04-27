@@ -123,4 +123,5 @@ lrx frameit --to es,pt-BR
 ### Environment & Safety
 - **`GEMINI_API_KEY`**: Must be set in the environment.
 - **Cache**: Local SQLite cache prevents redundant API calls. Use `lrx cache-clear` to reset.
-- **Placeholders**: The tool automatically masks variables (e.g., `%@`, `{name}`, `$1`) to ensure they are not corrupted during translation.
+- **Placeholders**: The tool automatically masks variables (e.g., `%@`, `{name}`, `$1`), HTML/CDATA markup in Android `strings.xml`, escape sequences (`\n`, `\t`, `\u00A0`, …), and Markdown link URLs so they are not corrupted during translation.
+- **Plurals**: For `.xcstrings` and Android `<plurals>`, the translator is CLDR-aware — it expands source forms (e.g., English `one`/`other`) into the full set of categories required by the target language (Russian `one`/`few`/`many`/`other`, Arabic six forms, etc.) in a single API call.

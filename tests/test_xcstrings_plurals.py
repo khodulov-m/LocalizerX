@@ -114,60 +114,128 @@ class TestPluralTranslation:
     """Test translation of plural forms."""
 
     @pytest.mark.asyncio
-    async def test_translate_plural_forms(self):
-        """Test _translate_plural_forms method."""
+    async def test_translate_plural_forms_expands_to_target_categories(self):
+        """English (one/other) → Russian (one/few/many/other) in a single call."""
         translator = GeminiTranslator(api_key="fake-key")
 
         plural_forms = {"one": "%lld week", "other": "%lld weeks"}
 
-        # Mock API calls
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
-            # First call for "one" form, second for "other"
-            mock_api.side_effect = [
-                "__PH_1__ неделя",  # Russian singular
-                "__PH_1__ недель",  # Russian plural (genitive)
-            ]
+            mock_api.return_value = (
+                '{"one": "__PH_1__ неделя",'
+                ' "few": "__PH_1__ недели",'
+                ' "many": "__PH_1__ недель",'
+                ' "other": "__PH_1__ недели"}'
+            )
 
             results = await translator._translate_plural_forms(plural_forms, "en", "ru")
 
-        assert len(results) == 2
-        assert "one" in results
-        assert "other" in results
+        assert mock_api.await_count == 1, "Plural translation must take exactly one API call"
+        assert set(results.keys()) == {"one", "few", "many", "other"}
         assert results["one"] == "%lld неделя"
-        assert results["other"] == "%lld недель"
+        assert results["few"] == "%lld недели"
+        assert results["many"] == "%lld недель"
+
+    @pytest.mark.asyncio
+    async def test_translate_plural_forms_simple_target(self):
+        """English → Spanish (one/other) keeps two categories."""
+        translator = GeminiTranslator(api_key="fake-key")
+        plural_forms = {"one": "%lld week", "other": "%lld weeks"}
+
+        with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
+            mock_api.return_value = (
+                '{"one": "__PH_1__ semana", "other": "__PH_1__ semanas"}'
+            )
+            results = await translator._translate_plural_forms(plural_forms, "en", "es")
+
+        assert results == {"one": "%lld semana", "other": "%lld semanas"}
+
+    @pytest.mark.asyncio
+    async def test_translate_plural_forms_arabic(self):
+        """English → Arabic gets all six CLDR categories."""
+        translator = GeminiTranslator(api_key="fake-key")
+        plural_forms = {"one": "%d item", "other": "%d items"}
+
+        with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
+            mock_api.return_value = json.dumps(
+                {
+                    "zero": "لا عناصر",
+                    "one": "عنصر __PH_1__",
+                    "two": "عنصران __PH_1__",
+                    "few": "__PH_1__ عناصر",
+                    "many": "__PH_1__ عنصرًا",
+                    "other": "__PH_1__ عنصر",
+                },
+                ensure_ascii=False,
+            )
+            results = await translator._translate_plural_forms(plural_forms, "en", "ar")
+
+        assert set(results.keys()) == {"zero", "one", "two", "few", "many", "other"}
+        # Placeholders are restored.
+        assert "%d" in results["one"]
+        assert "%d" in results["many"]
+
+    @pytest.mark.asyncio
+    async def test_translate_plural_forms_strips_code_fences(self):
+        """JSON wrapped in ```json ... ``` is parsed correctly."""
+        translator = GeminiTranslator(api_key="fake-key")
+        plural_forms = {"one": "%d item", "other": "%d items"}
+
+        with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
+            mock_api.return_value = (
+                '```json\n{"one": "__PH_1__ Element", "other": "__PH_1__ Elemente"}\n```'
+            )
+            results = await translator._translate_plural_forms(plural_forms, "en", "de")
+
+        assert results["one"] == "%d Element"
+        assert results["other"] == "%d Elemente"
+
+    @pytest.mark.asyncio
+    async def test_translate_plural_forms_falls_back_to_source_on_missing(self):
+        """If the model omits a category, the source form is used as a fallback."""
+        translator = GeminiTranslator(api_key="fake-key")
+        plural_forms = {"one": "%d item", "other": "%d items"}
+
+        with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
+            # Model returns 'one' and 'other' but skips 'few' and 'many'.
+            mock_api.return_value = (
+                '{"one": "__PH_1__ предмет", "other": "__PH_1__ предметов"}'
+            )
+            results = await translator._translate_plural_forms(plural_forms, "en", "ru")
+
+        assert set(results.keys()) == {"one", "few", "many", "other"}
+        assert results["one"] == "%d предмет"
+        # Missing categories fall back to source's 'other' form.
+        assert results["few"] == "%d items"
+        assert results["many"] == "%d items"
 
     @pytest.mark.asyncio
     async def test_translate_batch_with_plurals(self):
-        """Test translate_batch with plural forms in request."""
         translator = GeminiTranslator(api_key="fake-key")
 
         requests = [
             TranslationRequest(
                 key="weeks_ago",
-                text="%lld weeks",  # This is just for context, actual forms are in plural_forms
+                text="%lld weeks",
                 plural_forms={"one": "%lld week", "other": "%lld weeks"},
             )
         ]
 
-        # Mock API calls
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
-            mock_api.side_effect = [
-                "__PH_1__ semana",  # Spanish singular
-                "__PH_1__ semanas",  # Spanish plural
-            ]
-
+            mock_api.return_value = (
+                '{"one": "__PH_1__ semana", "other": "__PH_1__ semanas"}'
+            )
             results = await translator.translate_batch(requests, "en", "es")
 
         assert len(results) == 1
-        result = results[0]
-        assert result.key == "weeks_ago"
-        assert result.translated_plurals is not None
-        assert result.translated_plurals["one"] == "%lld semana"
-        assert result.translated_plurals["other"] == "%lld semanas"
+        assert results[0].translated_plurals == {
+            "one": "%lld semana",
+            "other": "%lld semanas",
+        }
 
     @pytest.mark.asyncio
     async def test_translate_mixed_batch(self):
-        """Test batch with both plural and simple strings."""
+        """Batch with both plural and simple strings."""
         translator = GeminiTranslator(api_key="fake-key")
 
         requests = [
@@ -178,29 +246,20 @@ class TestPluralTranslation:
         ]
 
         with patch.object(translator, "_call_api", new_callable=AsyncMock) as mock_api:
-            # First call: plural "one" form
-            # Second call: plural "other" form
-            # Third call: "Hello" translation batch
+            # First call: plural JSON. Second: batch translation of "Hello".
             mock_api.side_effect = [
-                "__PH_1__ elemento",  # Plural one
-                "__PH_1__ elementos",  # Plural other
-                "Hola",  # Simple string
+                '{"one": "__PH_1__ elemento", "other": "__PH_1__ elementos"}',
+                "Hola",
             ]
-
             results = await translator.translate_batch(requests, "en", "es")
 
         assert len(results) == 2
-
-        # Simple string result
-        assert results[0].key == "simple"
         assert results[0].translated == "Hola"
         assert results[0].translated_plurals is None
-
-        # Plural string result
-        assert results[1].key == "plural"
-        assert results[1].translated_plurals is not None
-        assert results[1].translated_plurals["one"] == "%d elemento"
-        assert results[1].translated_plurals["other"] == "%d elementos"
+        assert results[1].translated_plurals == {
+            "one": "%d elemento",
+            "other": "%d elementos",
+        }
 
 
 class TestPluralWriting:

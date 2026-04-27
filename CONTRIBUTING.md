@@ -41,7 +41,7 @@ localizerx/
 ├── io/                   # Low-level I/O handlers
 ├── parser/               # Domain entities and Pydantic data models
 ├── translator/           # Translation provider adapters
-└── utils/                # Shared utilities (placeholders, locales, limits)
+└── utils/                # Shared utilities (placeholders, locales, limits, CLDR plural rules)
 
 tests/                    # All test files live here
 pyproject.toml            # Project metadata, dependencies, and tool configuration
@@ -52,11 +52,21 @@ Key design principles:
 - **Clean Architecture:** Business logic is isolated from the CLI framework. Orchestration happens in Use Cases, which depend on abstract Ports.
 - **Lossless parsing:** a `read` followed by a `write` must preserve the original file
   structure exactly. Only translation entries are added.
-- **Placeholder masking:** placeholders (`%@`, `%d`, `{name}`, `$NAME$`, etc.) are
-  replaced with neutral tokens (`__PH_1__`, `__PH_2__`, ...) before any text reaches a
-  translation API, then restored afterward.
-- **SQLite caching:** translations are cached locally with the key
-  `(src_lang, tgt_lang, text_hash)` to avoid redundant API calls.
+- **Placeholder masking:** placeholders (`%@`, `%d`, `{name}`, `$NAME$`, etc.),
+  HTML/XML tags, `<![CDATA[...]]>` blocks, backslash escape sequences (`\n`, `\t`,
+  `\u00A0`, ...) and Markdown link URLs (`[text](url)`) are replaced with neutral
+  tokens (`__PH_1__`, `__PH_2__`, ...) before any text reaches a translation API,
+  then restored afterward.
+- **CLDR-aware plurals:** plural strings are translated in a single API call
+  per entry, with the prompt declaring the CLDR plural categories required by
+  the target language and the number ranges that map to each. The translator
+  expands a source that only has `one`/`other` into the full set required by
+  Russian (`one`/`few`/`many`/`other`), Arabic (six categories), and so on.
+  Category and rule data live in `localizerx/utils/plural_rules.py`.
+- **SQLite caching:** translations are cached locally to avoid redundant API
+  calls. Plural cache keys are content-based and additionally include the
+  developer comment, custom instructions, and app context so that changing any
+  of those forces a fresh translation.
 
 ---
 
