@@ -185,8 +185,13 @@ class TranslateCatalogUseCase:
                                 "stringUnit": {"state": "translated", "value": form_value}
                             }
                     
+                    existing = working_catalog.strings[key].translations.get(lang)
                     working_catalog.strings[key].translations[lang] = Translation(
-                        value=value, variations=variations
+                        # Plural entries live entirely in variations; a stringUnit
+                        # alongside them is what Xcode never writes.
+                        value="" if variations else value,
+                        variations=variations,
+                        extra=existing.extra if existing else {},
                     )
 
         self.repository.write(working_catalog, request.file_path, backup=request.backup)
