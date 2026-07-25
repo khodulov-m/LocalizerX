@@ -102,12 +102,15 @@ def _parse_entry(key: str, data: dict[str, Any], source_language: str) -> Entry:
 
 def _parse_translation(loc_data: dict[str, Any]) -> Translation | None:
     """Parse a translation from localization data."""
+    extra = {k: v for k, v in loc_data.items() if k not in ("stringUnit", "variations")}
+
     if "stringUnit" in loc_data:
         unit = loc_data["stringUnit"]
         return Translation(
             value=unit.get("value", ""),
             state=unit.get("state", "translated"),
             variations=loc_data.get("variations"),
+            extra=extra,
         )
     elif "variations" in loc_data:
         # Handle plural-only entries
@@ -115,6 +118,7 @@ def _parse_translation(loc_data: dict[str, Any]) -> Translation | None:
             value="",
             state="translated",
             variations=loc_data["variations"],
+            extra=extra,
         )
     return None
 

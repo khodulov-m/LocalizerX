@@ -13,10 +13,17 @@ class Translation(BaseModel):
     value: str
     state: str = "translated"
     variations: dict[str, Any] | None = None
+    # Keys of the localization we don't model (e.g. "substitutions"), preserved verbatim
+    extra: dict[str, Any] = Field(default_factory=dict)
 
     def to_xcstrings_dict(self) -> dict[str, Any]:
         """Convert to xcstrings format."""
-        result: dict[str, Any] = {"stringUnit": {"state": self.state, "value": self.value}}
+        result: dict[str, Any] = {}
+        # A localization carries either a stringUnit or variations. Emitting an empty
+        # stringUnit next to variations corrupts plural entries, so skip it there.
+        if self.value or not self.variations:
+            result["stringUnit"] = {"state": self.state, "value": self.value}
+        result.update(self.extra)
         if self.variations:
             result["variations"] = self.variations
         return result
