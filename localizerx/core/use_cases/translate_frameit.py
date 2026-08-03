@@ -8,6 +8,7 @@ from typing import Any, Callable
 from localizerx.core.ports.repository import CatalogRepository
 from localizerx.parser.frameit_model import FrameitCatalog, FrameitString
 from localizerx.translator.base import TranslationRequest, Translator
+from localizerx.utils.formality import resolve_translator_formality
 
 @dataclass
 class FrameitTranslationTask:
@@ -80,6 +81,7 @@ class TranslateFrameitUseCase:
             return result
 
         all_results = {} # locale -> {titles: {key: val}, keywords: {key: val}}
+        formality = resolve_translator_formality(self.translator)
 
         for locale, task in tasks.items():
             total = (1 if task.titles else 0) + (1 if task.keywords else 0)
@@ -93,7 +95,8 @@ class TranslateFrameitUseCase:
                     source_strings=titles_dict,
                     src_lang=request.source_locale,
                     tgt_lang=locale,
-                    custom_prompt=request.custom_instructions
+                    custom_prompt=request.custom_instructions,
+                    formality=formality,
                 )
                 resp = await self.translator._call_api(prompt)
                 
@@ -119,7 +122,8 @@ class TranslateFrameitUseCase:
                     source_strings=keywords_dict,
                     src_lang=request.source_locale,
                     tgt_lang=locale,
-                    custom_prompt=request.custom_instructions
+                    custom_prompt=request.custom_instructions,
+                    formality=formality,
                 )
                 resp = await self.translator._call_api(prompt)
                 

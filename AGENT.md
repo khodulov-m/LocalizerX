@@ -99,6 +99,7 @@ lrx i18n-info
 
 ## Advanced Options
 - `--custom-prompt "..."` : Add specific context (e.g., "Do not translate brand names").
+- `--formality informal|formal|auto` : Pin the form of address in the target language (German `du` vs `Sie`, French `tu` vs `vous`, Russian `ты` vs `вы`). Defaults to the `formality` value in the config, which is `auto`.
 - `--preview` / `-p` : Interactively review proposed translations before applying.
 - `--dry-run` / `-n` : Show what would happen without modifying files.
 - `--overwrite` : Overwrite existing translations.

@@ -8,6 +8,7 @@ from typing import Any, Callable
 from localizerx.core.ports.repository import CatalogRepository
 from localizerx.parser.screenshots_model import DeviceClass, ScreenshotsCatalog, ScreenshotTextType
 from localizerx.translator.base import TranslationRequest, Translator
+from localizerx.utils.formality import resolve_translator_formality
 
 @dataclass
 class ScreenshotsTranslationTask:
@@ -80,8 +81,9 @@ class TranslateScreenshotsUseCase:
             return result
 
         all_results = {} # locale -> {(screen_id, text_type, device_class): translation}
-        
+
         batch_size = request.batch_size
+        formality = resolve_translator_formality(self.translator)
 
         for locale, task in tasks.items():
             # Resolve source texts
@@ -116,6 +118,7 @@ class TranslateScreenshotsUseCase:
                             device_class=device_class,
                             src_lang=request.source_lang,
                             tgt_lang=locale,
+                            formality=formality,
                         )
                         response = await self.translator._call_api(prompt)
                         translations = [response.strip()]
@@ -124,6 +127,7 @@ class TranslateScreenshotsUseCase:
                             items=batch,
                             src_lang=request.source_lang,
                             tgt_lang=locale,
+                            formality=formality,
                         )
                         response = await self.translator._call_api(prompt)
                         translations = parse_batch_screenshot_response(response, len(batch))

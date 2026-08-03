@@ -7,6 +7,7 @@ from typing import Any, Callable
 from localizerx.core.ports.repository import CatalogRepository
 from localizerx.parser.extension_model import ExtensionCatalog, ExtensionMessage
 from localizerx.translator.base import TranslationRequest, Translator
+from localizerx.utils.formality import resolve_translator_formality
 from localizerx.utils.limits import (
     SHORTEN_MAX_RETRIES,
     LimitAction,
@@ -107,6 +108,7 @@ class TranslateExtensionUseCase:
 
         all_results = {} # locale -> {key: translation}
         limit_warnings = []
+        formality = resolve_translator_formality(self.translator)
 
         for locale, task in tasks.items():
             task_id = on_translation_start(locale, len(task.messages)) if on_translation_start else None
@@ -129,6 +131,7 @@ class TranslateExtensionUseCase:
                     field_type=field_type,
                     src_lang=request.source_locale,
                     tgt_lang=locale,
+                    formality=formality,
                 )
 
                 translated = await self.translator._call_api(prompt)

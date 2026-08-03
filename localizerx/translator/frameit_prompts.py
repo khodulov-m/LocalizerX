@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from localizerx.utils.formality import FORMALITY_AUTO, build_formality_directive
 from localizerx.utils.locale import get_fastlane_locale_name
 
 
@@ -12,6 +13,7 @@ def build_frameit_prompt(
     src_lang: str,
     tgt_lang: str,
     custom_prompt: str | None = None,
+    formality: str = FORMALITY_AUTO,
 ) -> str:
     """Build a prompt for translating a dictionary of frameit strings."""
     src_name = get_fastlane_locale_name(src_lang) or src_lang
@@ -25,6 +27,10 @@ def build_frameit_prompt(
         "Maintain the marketing tone and keep translations as short as possible.",
         "",
     ]
+
+    formality_directive = build_formality_directive(tgt_lang, formality)
+    if formality_directive:
+        prompt.extend([formality_directive, ""])
 
     if custom_prompt:
         prompt.extend(["Custom Instructions:", custom_prompt, ""])

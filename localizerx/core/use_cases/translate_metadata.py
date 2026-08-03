@@ -9,6 +9,7 @@ from localizerx.core.ports.repository import CatalogRepository
 from localizerx.parser.app_context import AppContext
 from localizerx.parser.metadata_model import MetadataCatalog, MetadataFieldType
 from localizerx.translator.base import TranslationRequest, Translator
+from localizerx.utils.formality import resolve_translator_formality
 
 
 @dataclass
@@ -107,6 +108,7 @@ class TranslateMetadataUseCase:
         limit_warnings = []
         source_meta = catalog.get_source_metadata()
         app_context = AppContext.from_metadata(source_meta) if source_meta else None
+        formality = resolve_translator_formality(self.translator)
 
         semaphore = asyncio.Semaphore(5)
 
@@ -150,14 +152,23 @@ class TranslateMetadataUseCase:
 
                 if len(batch_items) == 1:
                     ft, text = batch_items[0]
-                    prompt = build_metadata_prompt(text, ft, request.source_locale, target_locale)
+                    prompt = build_metadata_prompt(
+                        text,
+                        ft,
+                        request.source_locale,
+                        target_locale,
+                        formality=formality,
+                    )
                     translated = await self.translator._call_api(prompt)
                     res_dict[ft] = translated.strip()
                     if on_translation_progress and task_id:
                         on_translation_progress(task_id, 1)
                 elif len(batch_items) > 1:
                     prompt = build_batch_metadata_prompt(
-                        batch_items, request.source_locale, target_locale
+                        batch_items,
+                        request.source_locale,
+                        target_locale,
+                        formality=formality,
                     )
                     response = await self.translator._call_api(prompt)
                     translations = parse_batch_metadata_response(response, len(batch_items))

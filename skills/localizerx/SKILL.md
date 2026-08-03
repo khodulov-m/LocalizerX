@@ -25,7 +25,7 @@ lrx languages
 
 ## Translation Commands
 
-All translation commands support global options like `--to`, `--src`, `--dry-run`, `--preview`, and `--custom-prompt`.
+All translation commands support global options like `--to`, `--src`, `--dry-run`, `--preview`, `--custom-prompt`, and `--formality`.
 
 ### iOS String Catalogs (`.xcstrings`)
 
@@ -115,6 +115,7 @@ lrx frameit --to es,pt-BR
 - `--preview`, `-p`: Show proposed translations and wait for confirmation.
 - `--overwrite`: Overwrite existing translations (use with caution).
 - `--custom-prompt`, `--instructions`: Add specific context (e.g., "Keep brand names in English").
+- `--formality`: Form of address in the target language — `informal` (German `du`, French `tu`, Russian `ты`), `formal` (`Sie`/`vous`/`вы`) or `auto` (default; the model usually picks the polite form). Set `formality` in `config.toml` to apply it to every run of a project.
 - `--backup`, `-b`: Create a `.bak` file before writing changes.
 - `--batch-size`: Control number of strings per API call (1-100).
 - `--no-app-context`: Disable automatic extraction of app context from project files.

@@ -18,6 +18,7 @@ Whether you're building a macOS app, a Chrome extension, or a web project, we've
 - **📦 Multi-Format Support:** Translate `.xcstrings`, fastlane metadata, Chrome Extensions, frontend JSONs, and Android `strings.xml`.
 - **🚀 ASO-Optimized:** Generate and translate App Store screenshot texts with marketing-focused prompts designed to boost your store presence.
 - **🛡️ Safe & Smart:** Automatically preserves placeholders (`%@`, `{name}`, `$1`, …), HTML/CDATA markup, escape sequences, and Markdown link URLs; respects developer comments for context.
+- **🗣️ Consistent Tone of Voice:** Pin the form of address per project (`--formality informal`) so German stays on `du`, French on `tu` and Russian on `ты` instead of drifting into the polite forms.
 - **⚡ Fast & Efficient:** Uses SQLite caching to avoid redundant API calls and save you money.
 - **🛠️ Flexible:** Supports CLDR-aware pluralization (expands English `one`/`other` into the full set of categories required by Russian, Arabic, Polish, …), declension forms, and character limit enforcement.
 
@@ -117,6 +118,7 @@ model = "gemini-3-flash-preview"
 temperature = 1.0
 batch_size = 180
 use_app_context = true # Helps AI understand your app's context for better translations!
+formality = "informal"  # du / tu / ты — use "formal" for Sie / vous / вы, "auto" to let the model pick
 
 # Command-specific overrides
 [metadata]
@@ -222,6 +224,7 @@ lrx i18n --remove de
 | `--to` | `-t` | Target languages (comma-separated). |
 | `--remove` | `-r` | Languages to remove (comma-separated). |
 | `--src` | `-s` | Source language (default: `en`). |
+| `--formality` | | Form of address: `informal` (du/tu/ты), `formal` (Sie/vous/вы) or `auto`. |
 | `--refresh` | | Add new strings and clean up stale ones automatically. |
 | `--mark-empty` | | Mark empty/whitespace strings as translated. |
 | `--preview` | `-p` | Review translations before they are saved. |

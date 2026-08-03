@@ -9,7 +9,16 @@ from localizerx.parser.screenshots_model import (
     DeviceClass,
     ScreenshotTextType,
 )
+from localizerx.utils.formality import FORMALITY_AUTO, build_formality_directive
 from localizerx.utils.locale import get_language_name
+
+
+def _formality_block(tgt_lang: str, formality: str) -> str:
+    """Render the form-of-address directive as its own prompt paragraph."""
+    directive = build_formality_directive(tgt_lang, formality)
+    if not directive:
+        return ""
+    return f"\n{directive}\n"
 
 
 def build_screenshot_prompt(
@@ -18,6 +27,7 @@ def build_screenshot_prompt(
     device_class: DeviceClass,
     src_lang: str,
     tgt_lang: str,
+    formality: str = FORMALITY_AUTO,
 ) -> str:
     """
     Build an ASO-optimized translation prompt for screenshot text.
@@ -34,6 +44,7 @@ def build_screenshot_prompt(
         device_class: Target device class (small or large)
         src_lang: Source language code
         tgt_lang: Target language code
+        formality: Form of address to enforce ("auto", "formal", "informal")
 
     Returns:
         Formatted prompt string for the Gemini API
@@ -43,6 +54,7 @@ def build_screenshot_prompt(
 
     text_context = _get_text_type_context(text_type)
     device_context = _get_device_context(device_class)
+    formality_block = _formality_block(tgt_lang, formality)
 
     word_count = len(text.split())
     type_name = text_type.value.upper()
@@ -58,7 +70,7 @@ CRITICAL RULES (MUST FOLLOW):
 
 TEXT TYPE: {text_type.value}
 {text_context}
-
+{formality_block}
 WORD COUNT: Original has {word_count} words. Max {SCREENSHOT_TEXT_WORD_LIMIT} words allowed.
 
 Original text:
@@ -112,6 +124,7 @@ def build_batch_screenshot_prompt(
     items: list[tuple[str, ScreenshotTextType, DeviceClass, str]],
     src_lang: str,
     tgt_lang: str,
+    formality: str = FORMALITY_AUTO,
 ) -> str:
     """
     Build a batch translation prompt for multiple screenshot texts.
@@ -120,12 +133,14 @@ def build_batch_screenshot_prompt(
         items: List of (screen_id, text_type, device_class, text) tuples
         src_lang: Source language code
         tgt_lang: Target language code
+        formality: Form of address to enforce ("auto", "formal", "informal")
 
     Returns:
         Formatted prompt string for the Gemini API
     """
     src_name = get_language_name(src_lang)
     tgt_name = get_language_name(tgt_lang)
+    formality_block = _formality_block(tgt_lang, formality)
 
     texts_block = []
     for i, (screen_id, text_type, device_class, text) in enumerate(items, 1):
@@ -143,7 +158,7 @@ CRITICAL RULES (MUST FOLLOW FOR ALL):
 3. Use natural, marketing-oriented language
 4. Optimize for ASO (App Store Optimization)
 5. [SHORT] items should be extra concise
-
+{formality_block}
 Texts to adapt:
 
 {texts_str}

@@ -9,7 +9,13 @@ from typing import Annotated, Optional
 import typer
 from rich.table import Table
 
-from localizerx.cli.utils import console, create_progress
+from localizerx.cli.utils import (
+    FORMALITY_HELP,
+    announce_formality,
+    console,
+    create_progress,
+    resolve_formality,
+)
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
@@ -97,6 +103,13 @@ def i18n_translate(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    formality: Annotated[
+        Optional[str],
+        typer.Option(
+            "--formality",
+            help=FORMALITY_HELP,
+        ),
+    ] = None,
     update_index: Annotated[
         bool,
         typer.Option(
@@ -128,6 +141,7 @@ def i18n_translate(
         backup=backup,
         batch_size=batch_size,
         model=model,
+        formality=formality,
         update_index=update_index,
         remove=remove,
     )
@@ -207,6 +221,7 @@ def _run_i18n_translate(
     backup: bool,
     batch_size: int | None,
     model: str | None,
+    formality: str | None = None,
     update_index: bool = True,
     remove: str | None = None,
 ) -> None:
@@ -235,7 +250,9 @@ def _run_i18n_translate(
     cache_dir = get_cache_dir(config)
     actual_batch_size = batch_size or config.i18n.batch_size
     actual_model = model or config.i18n.model
-    
+    actual_formality = resolve_formality(formality, config.i18n.formality)
+
+
     thinking_level = getattr(config.i18n, "thinking_level", "0")
     thinking_config = (
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
@@ -246,6 +263,7 @@ def _run_i18n_translate(
     if target_locales:
         target_display = ", ".join(f"{get_language_name(loc)} ({loc})" for loc in target_locales)
         console.print(f"[bold]Targets:[/bold] {target_display}")
+    announce_formality(actual_formality)
     console.print()
 
     # Callbacks
@@ -308,6 +326,8 @@ def _run_i18n_translate(
             batch_size=actual_batch_size,
             max_retries=config.i18n.max_retries,
             cache_dir=cache_dir,
+            custom_instructions=config.i18n.custom_instructions,
+            formality=actual_formality,
         ) as translator:
             
             use_case = TranslateI18nUseCase(repository=repository, translator=translator)

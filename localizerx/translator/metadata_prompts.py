@@ -6,6 +6,7 @@ import re
 
 from localizerx.parser.app_context import AppContext
 from localizerx.parser.metadata_model import FIELD_LIMITS, MetadataFieldType
+from localizerx.utils.formality import FORMALITY_AUTO, build_formality_directive
 from localizerx.utils.locale import get_fastlane_locale_name
 
 
@@ -14,6 +15,7 @@ def build_metadata_prompt(
     field_type: MetadataFieldType,
     src_lang: str,
     tgt_lang: str,
+    formality: str = FORMALITY_AUTO,
 ) -> str:
     """
     Build a context-aware translation prompt for App Store metadata.
@@ -23,6 +25,7 @@ def build_metadata_prompt(
         field_type: The type of metadata field
         src_lang: Source language code
         tgt_lang: Target language code
+        formality: Form of address to enforce ("auto", "formal", "informal")
 
     Returns:
         Formatted prompt string for the Gemini API
@@ -33,6 +36,7 @@ def build_metadata_prompt(
 
     field_context = _get_field_context(field_type)
     field_rules = _get_field_rules(field_type)
+    formality_block = _formality_block(tgt_lang, formality)
 
     field_name = field_type.value.replace("_", " ")
     prompt = f"""Translate the following App Store {field_name} from {src_name} to {tgt_name}.
@@ -47,13 +51,25 @@ TRANSLATION RULES:
 3. Preserve the tone and marketing appeal of the original
 4. This is for the Apple App Store
 {field_rules}
-
+{formality_block}
 Original text ({len(text)} chars):
 {text}
 
 Translation (max {limit} chars, only provide the translated text):"""
 
     return prompt
+
+
+def _formality_block(tgt_lang: str, formality: str) -> str:
+    """Render the form-of-address directive as its own prompt paragraph.
+
+    Empty when no directive applies, so the surrounding prompt keeps the exact
+    layout it had before this setting existed.
+    """
+    directive = build_formality_directive(tgt_lang, formality)
+    if not directive:
+        return ""
+    return f"\n{directive}\n"
 
 
 def _get_field_context(field_type: MetadataFieldType) -> str:
@@ -178,6 +194,7 @@ def build_batch_metadata_prompt(
     items: list[tuple[MetadataFieldType, str]],
     src_lang: str,
     tgt_lang: str,
+    formality: str = FORMALITY_AUTO,
 ) -> str:
     """
     Build a batch translation prompt for multiple metadata fields.
@@ -188,12 +205,14 @@ def build_batch_metadata_prompt(
         items: List of (field_type, text) tuples
         src_lang: Source language code
         tgt_lang: Target language code
+        formality: Form of address to enforce ("auto", "formal", "informal")
 
     Returns:
         Formatted prompt string for the Gemini API
     """
     src_name = get_fastlane_locale_name(src_lang)
     tgt_name = get_fastlane_locale_name(tgt_lang)
+    formality_block = _formality_block(tgt_lang, formality)
 
     fields_text = []
     for i, (field_type, text) in enumerate(items, 1):
@@ -213,7 +232,7 @@ IMPORTANT RULES:
 - Translate naturally, preserving the marketing tone
 - Return translations using the EXACT SAME <<ITEM_N>> markers
 - Do NOT include field labels like [NAME] in your response — only the translated text inside each marker
-
+{formality_block}
 Fields to translate:
 
 {batch_text}

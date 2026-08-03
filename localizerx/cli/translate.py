@@ -9,7 +9,13 @@ from typing import Annotated, Optional
 import typer
 from rich.table import Table
 
-from localizerx.cli.utils import console, create_progress
+from localizerx.cli.utils import (
+    FORMALITY_HELP,
+    announce_formality,
+    console,
+    create_progress,
+    resolve_formality,
+)
 from localizerx.config import (
     GEMINI_MODELS,
     Config,
@@ -135,6 +141,13 @@ def translate(
             help="Custom instructions for translation (e.g., 'Do not translate proper names')",
         ),
     ] = None,
+    formality: Annotated[
+        Optional[str],
+        typer.Option(
+            "--formality",
+            help=FORMALITY_HELP,
+        ),
+    ] = None,
     no_app_context: Annotated[
         bool,
         typer.Option(
@@ -185,6 +198,7 @@ def translate(
         model=model,
         temperature=temperature,
         custom_prompt=custom_prompt,
+        formality=formality,
         no_app_context=no_app_context,
         refresh=refresh,
         mark_empty=mark_empty,
@@ -209,6 +223,7 @@ def _run_translate(
     refresh: bool,
     mark_empty: bool,
     remove: str | None = None,
+    formality: str | None = None,
 ) -> None:
     """Core translation logic."""
     # Load configuration
@@ -300,6 +315,7 @@ def _run_translate(
             model=model,
             temperature=temperature,
             custom_prompt=custom_prompt,
+            formality=formality,
             no_app_context=no_app_context,
             refresh=refresh,
             mark_empty=mark_empty,
@@ -384,6 +400,7 @@ def _process_file(
     no_app_context: bool,
     refresh: bool,
     mark_empty: bool,
+    formality: str | None = None,
 ) -> None:
     """Process a single xcstrings file."""
     console.print(f"[bold]Processing:[/bold] {file_path}")
@@ -395,6 +412,8 @@ def _process_file(
     actual_model = model or config.translate.model
     actual_temperature = temperature if temperature is not None else config.translate.temperature
     actual_custom_instructions = custom_prompt or config.translate.custom_instructions
+    actual_formality = resolve_formality(formality, config.translate.formality)
+    announce_formality(actual_formality)
 
     app_context = None
     if config.translate.use_app_context and not no_app_context:
@@ -469,6 +488,7 @@ def _process_file(
             temperature=actual_temperature,
             custom_instructions=actual_custom_instructions,
             app_context=app_context,
+            formality=actual_formality,
         ) as translator:
             
             use_case = TranslateCatalogUseCase(repository=repository, translator=translator)

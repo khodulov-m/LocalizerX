@@ -9,7 +9,7 @@ import typer
 from rich.table import Table
 
 from localizerx import __version__
-from localizerx.cli.utils import console
+from localizerx.cli.utils import FORMALITY_HELP, console
 from localizerx.config import (
     create_default_config,
     get_cache_dir,
@@ -143,6 +143,13 @@ def main(
             help="Custom instructions for translation (e.g., 'Do not translate proper names')",
         ),
     ] = None,
+    formality: Annotated[
+        Optional[str],
+        typer.Option(
+            "--formality",
+            help=FORMALITY_HELP,
+        ),
+    ] = None,
     no_app_context: Annotated[
         bool,
         typer.Option(
@@ -189,6 +196,7 @@ def main(
             model=model,
             temperature=temperature,
             custom_prompt=custom_prompt,
+            formality=formality,
             no_app_context=no_app_context,
             refresh=False,
             mark_empty=mark_empty,

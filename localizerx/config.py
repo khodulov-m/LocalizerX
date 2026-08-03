@@ -6,7 +6,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from localizerx.utils.formality import FORMALITY_AUTO, normalize_formality
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -31,6 +33,12 @@ DEFAULT_SCREENSHOTS_MODEL = "gemini-3-flash-preview"
 VALID_THINKING_LEVELS = ["minimal", "low", "medium", "high"]
 
 
+FORMALITY_FIELD_DESCRIPTION = (
+    "Form of address in the target language: 'auto' (let the model decide), "
+    "'informal' (du/tu/ты) or 'formal' (Sie/vous/вы)."
+)
+
+
 class ScreenshotsConfig(BaseModel):
     """Configuration for screenshot text generation/translation."""
 
@@ -39,6 +47,12 @@ class ScreenshotsConfig(BaseModel):
     thinking_level: str = Field(default="low")
     batch_size: int = Field(default=180, ge=1, le=500)
     custom_instructions: str | None = None
+    formality: str = Field(default=FORMALITY_AUTO, description=FORMALITY_FIELD_DESCRIPTION)
+
+    @field_validator("formality")
+    @classmethod
+    def _check_formality(cls, value: str) -> str:
+        return normalize_formality(value)
 
 
 class TranslatorConfig(BaseModel):
@@ -59,6 +73,12 @@ class TranslatorConfig(BaseModel):
         description="Automatically extract and use app context from fastlane metadata "
         "or Xcode projects in translation prompts.",
     )
+    formality: str = Field(default=FORMALITY_AUTO, description=FORMALITY_FIELD_DESCRIPTION)
+
+    @field_validator("formality")
+    @classmethod
+    def _check_formality(cls, value: str) -> str:
+        return normalize_formality(value)
 
 
 DEFAULT_TARGET_LANGUAGES = [
@@ -250,6 +270,12 @@ thinking_level = "0"
 # Example: "Do not translate proper names. Do not translate the word 'Water'"
 # custom_instructions = "Do not translate proper names"
 
+# Form of address in the target language.
+# "auto"     - let the model choose (it usually picks the polite form)
+# "informal" - du / tu / ты / je
+# "formal"   - Sie / vous / вы / u
+formality = "auto"
+
 # Automatically extract and use app context from fastlane metadata or Xcode projects
 use_app_context = true
 
@@ -295,6 +321,9 @@ thinking_level = "low"
 
 # Number of screenshot texts per batch API call (1–500)
 batch_size = 180
+
+# Form of address for screenshot texts ("auto", "informal", "formal")
+formality = "auto"
 """
 
     config_path.write_text(default_content)

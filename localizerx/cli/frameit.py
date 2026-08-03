@@ -9,7 +9,13 @@ from typing import Annotated, Optional
 import typer
 from rich.table import Table
 
-from localizerx.cli.utils import console, create_progress
+from localizerx.cli.utils import (
+    FORMALITY_HELP,
+    announce_formality,
+    console,
+    create_progress,
+    resolve_formality,
+)
 from localizerx.config import get_cache_dir, load_config
 from localizerx.io.frameit import (
     detect_frameit_path,
@@ -56,6 +62,10 @@ def frameit(
         Optional[str],
         typer.Option("--custom-prompt", help="Custom instructions for translation"),
     ] = None,
+    formality: Annotated[
+        Optional[str],
+        typer.Option("--formality", help=FORMALITY_HELP),
+    ] = None,
     model: Annotated[
         Optional[str],
         typer.Option("--model", "-m", help="Gemini model to use"),
@@ -98,6 +108,9 @@ def frameit(
     if not target_locales:
         console.print("[red]Error:[/red] No target locales specified.")
         raise typer.Exit(1)
+
+    actual_formality = resolve_formality(formality, config.frameit.formality)
+    announce_formality(actual_formality)
 
     # Initialize Framefile if needed
     ensure_framefile(base_path)
@@ -187,7 +200,8 @@ def frameit(
             model=actual_model,
             max_retries=config.frameit.max_retries,
             cache_dir=cache_dir,
-            custom_instructions=custom_prompt,
+            custom_instructions=custom_prompt or config.frameit.custom_instructions,
+            formality=actual_formality,
         ) as translator:
             
             use_case = TranslateFrameitUseCase(repository=repository, translator=translator)
@@ -198,7 +212,7 @@ def frameit(
                 dry_run=False,
                 preview=preview,
                 overwrite=overwrite,
-                custom_instructions=custom_prompt,
+                custom_instructions=custom_prompt or config.frameit.custom_instructions,
             )
             
             try:
