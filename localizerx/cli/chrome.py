@@ -9,7 +9,13 @@ from typing import Annotated, Optional
 import typer
 from rich.table import Table
 
-from localizerx.cli.utils import console, create_progress
+from localizerx.cli.utils import (
+    FORMALITY_HELP,
+    announce_formality,
+    console,
+    create_progress,
+    resolve_formality,
+)
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.base import TranslationRequest
 from localizerx.translator.gemini_adapter import GeminiTranslator
@@ -106,6 +112,13 @@ def chrome(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    formality: Annotated[
+        Optional[str],
+        typer.Option(
+            "--formality",
+            help=FORMALITY_HELP,
+        ),
+    ] = None,
     remove: Annotated[
         Optional[str],
         typer.Option(
@@ -140,6 +153,7 @@ def chrome(
         overwrite=overwrite,
         backup=backup,
         model=model,
+        formality=formality,
         remove=remove,
     )
 
@@ -250,6 +264,7 @@ def _run_chrome_translate(
     overwrite: bool,
     backup: bool,
     model: str | None,
+    formality: str | None = None,
     remove: str | None = None,
 ) -> None:
     """Core Chrome Extension translation logic."""
@@ -286,7 +301,10 @@ def _run_chrome_translate(
     
     cache_dir = get_cache_dir(config)
     actual_model = model or config.chrome.model
-    
+    actual_formality = resolve_formality(formality, config.chrome.formality)
+    announce_formality(actual_formality)
+
+
     thinking_level = getattr(config.chrome, "thinking_level", "0")
     thinking_config = (
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
@@ -366,6 +384,8 @@ def _run_chrome_translate(
             batch_size=config.chrome.batch_size,
             max_retries=config.chrome.max_retries,
             cache_dir=cache_dir,
+            custom_instructions=config.chrome.custom_instructions,
+            formality=actual_formality,
         ) as translator:
             
             use_case = TranslateExtensionUseCase(repository=repository, translator=translator)

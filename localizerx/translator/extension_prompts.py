@@ -3,7 +3,16 @@
 from __future__ import annotations
 
 from localizerx.parser.extension_model import EXTENSION_FIELD_LIMITS, ExtensionFieldType
-from localizerx.utils.locale import get_chrome_locale_name
+from localizerx.utils.formality import FORMALITY_AUTO, build_formality_directive
+from localizerx.utils.locale import chrome_to_standard_locale, get_chrome_locale_name
+
+
+def _formality_block(tgt_lang: str, formality: str) -> str:
+    """Render the form-of-address directive as its own prompt paragraph."""
+    directive = build_formality_directive(chrome_to_standard_locale(tgt_lang), formality)
+    if not directive:
+        return ""
+    return f"\n{directive}\n"
 
 
 def build_extension_field_prompt(
@@ -13,6 +22,7 @@ def build_extension_field_prompt(
     field_type: ExtensionFieldType,
     src_lang: str,
     tgt_lang: str,
+    formality: str = FORMALITY_AUTO,
 ) -> str:
     """
     Build a context-aware translation prompt for a Chrome Web Store field.
@@ -24,6 +34,7 @@ def build_extension_field_prompt(
         field_type: The CWS field type
         src_lang: Source Chrome locale code
         tgt_lang: Target Chrome locale code
+        formality: Form of address to enforce ("auto", "formal", "informal")
 
     Returns:
         Formatted prompt string for the Gemini API
@@ -34,6 +45,7 @@ def build_extension_field_prompt(
 
     field_context = _get_extension_field_context(field_type)
     field_rules = _get_extension_field_rules(field_type)
+    formality_block = _formality_block(tgt_lang, formality)
 
     desc_line = ""
     if description:
@@ -53,7 +65,7 @@ TRANSLATION RULES:
 3. Preserve the tone and marketing appeal of the original
 4. This is for a Chrome Web Store listing - optimize for discoverability
 {field_rules}
-
+{formality_block}
 Original text ({len(text)} chars):
 {text}
 
@@ -132,6 +144,7 @@ def build_extension_batch_prompt(
     items: list[tuple[str, str, str | None]],
     src_lang: str,
     tgt_lang: str,
+    formality: str = FORMALITY_AUTO,
 ) -> str:
     """
     Build a batch translation prompt for regular extension messages.
@@ -140,12 +153,14 @@ def build_extension_batch_prompt(
         items: List of (key, message, description) tuples
         src_lang: Source Chrome locale code
         tgt_lang: Target Chrome locale code
+        formality: Form of address to enforce ("auto", "formal", "informal")
 
     Returns:
         Formatted prompt string for the Gemini API
     """
     src_name = get_chrome_locale_name(src_lang)
     tgt_name = get_chrome_locale_name(tgt_lang)
+    formality_block = _formality_block(tgt_lang, formality)
 
     texts = []
     for i, (key, message, description) in enumerate(items, 1):
@@ -167,7 +182,7 @@ IMPORTANT RULES:
 4. This is for a Chrome browser extension
 5. Return ONLY the translations, numbered to match the input
 6. Use the [Context] hints to improve translation quality
-
+{formality_block}
 Messages to translate:
 {batch_text}
 

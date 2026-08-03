@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import AsyncIterator
 
+from localizerx.utils.formality import FORMALITY_AUTO
+
 
 @dataclass
 class TranslationRequest:
@@ -35,6 +37,10 @@ class TranslationResult:
 
 class Translator(ABC):
     """Abstract base class for translation providers."""
+
+    # Form of address to enforce in the target language ("auto"/"formal"/"informal").
+    # Use cases that build their own prompts read it from here.
+    formality: str = FORMALITY_AUTO
 
     @abstractmethod
     async def translate_text(

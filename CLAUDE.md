@@ -38,6 +38,10 @@ localizerx android --remove fr,es
 # Translate with custom instructions
 localizerx translate <path> --to fr,es,de --custom-prompt "Do not translate proper names. Do not translate the word 'Water'"
 
+# Pin the form of address (du/tu/ты instead of Sie/vous/вы)
+localizerx translate <path> --to de,fr,pt-PT --formality informal
+localizerx i18n --to de,pt-PT --formality informal
+
 # Run delete command
 localizerx delete fr,de --backup
 localizerx delete --all --yes
@@ -100,6 +104,7 @@ CLI (Typer)  [localizerx/cli/]
 - `localizerx/translator/screenshots_generation_prompts.py` - ASO-optimized prompts for screenshot text generation
 - `localizerx/utils/placeholders.py` - Placeholder masking/unmasking (%@, %d, {name}, $NAME$, $1, HTML/XML tags, CDATA, escape sequences, Markdown link URLs)
 - `localizerx/utils/plural_rules.py` - CLDR plural categories and number-range rules per language (drives plural-translation prompts)
+- `localizerx/utils/formality.py` - Form of address (T–V distinction) per language; turns `auto`/`formal`/`informal` into a prompt directive
 - `localizerx/utils/locale.py` - Language/locale mapping
 - `localizerx/utils/limits.py` - Character limit validation (App Store + Chrome Web Store)
 - `localizerx/utils/context.py` - App context extraction (from metadata, workspace, project)
@@ -110,7 +115,8 @@ CLI (Typer)  [localizerx/cli/]
 - **Translator abstraction**: Provider-agnostic interface allows swapping Gemini for other APIs
 - **Placeholder masking**: Mask placeholders, HTML/CDATA, escape sequences, and Markdown link URLs before translation (`%@` → `__PH_1__`, `<b>` → `__PH_2__`, …), restore after
 - **CLDR-aware plurals**: For xcstrings and Android `<plurals>`, the translator sends all source forms in one API call along with the target language's CLDR categories and number-range rules, so it can emit every required category (e.g. expand English `one`/`other` to Russian `one`/`few`/`many`/`other`)
-- **SQLite caching**: Translations are cached locally to avoid redundant API calls. Plural cache keys additionally include the developer comment, custom instructions, and app context
+- **Form of address**: `formality` (`auto`/`formal`/`informal`, CLI `--formality`, config field per command) pins the T–V register in the target language. The directive is injected into every prompt builder that knows the target language; `auto` leaves prompts byte-identical to the pre-setting behaviour
+- **SQLite caching**: Translations are cached locally to avoid redundant API calls. Cache keys include the formality, custom instructions, and app context, so changing any of them re-translates instead of returning stale wording. Plural cache keys additionally include the developer comment
 - **Custom instructions**: Support for custom translation rules via `--custom-prompt` CLI option or `custom_instructions` config field
 
 ### Data Models

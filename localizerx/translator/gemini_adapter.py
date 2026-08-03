@@ -14,6 +14,11 @@ from typing import Any
 import httpx
 
 from localizerx.config import DEFAULT_MODEL
+from localizerx.utils.formality import (
+    FORMALITY_AUTO,
+    build_formality_directive,
+    normalize_formality,
+)
 from localizerx.utils.locale import get_language_name
 from localizerx.utils.placeholders import mask_placeholders, unmask_placeholders
 from localizerx.utils.plural_rules import (
@@ -109,6 +114,7 @@ class GeminiTranslator(Translator):
         thinking_config: dict[str, str] | None = None,
         custom_instructions: str | None = None,
         app_context: str | None = None,
+        formality: str | None = FORMALITY_AUTO,
     ):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
@@ -124,6 +130,7 @@ class GeminiTranslator(Translator):
         self.thinking_config = thinking_config
         self.custom_instructions = custom_instructions
         self.app_context = app_context
+        self.formality = normalize_formality(formality)
         self.client = httpx.AsyncClient(timeout=60.0)
 
         # Setup cache
@@ -148,9 +155,25 @@ class GeminiTranslator(Translator):
         """)
         self._cache_conn.commit()
 
+    def _prompt_signature(self) -> str:
+        """Signature of everything besides the text that shapes a translation.
+
+        Without it, changing the form of address (or the custom instructions, or
+        the app context) would keep returning the previously cached wording.
+        """
+        return json.dumps(
+            {
+                "formality": self.formality,
+                "instructions": self.custom_instructions or "",
+                "context": self.app_context or "",
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+
     def _cache_key(self, text: str, src_lang: str, tgt_lang: str) -> str:
         """Generate cache key for a translation."""
-        content = f"{src_lang}:{tgt_lang}:{text}"
+        content = f"{src_lang}:{tgt_lang}:{self._prompt_signature()}:{text}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
 
     def _get_cached(self, text: str, src_lang: str, tgt_lang: str) -> str | None:
@@ -266,6 +289,7 @@ class GeminiTranslator(Translator):
             "comment": comment or "",
             "instructions": self.custom_instructions or "",
             "context": self.app_context or "",
+            "formality": self.formality,
         }
         return "plural:" + json.dumps(payload, sort_keys=True, ensure_ascii=False)
 
@@ -311,6 +335,9 @@ CRITICAL RULES:
 6. Do NOT add, remove, or merge categories. Output exactly: {categories_list}.
 7. This is for an iOS/macOS/Android app UI — keep it natural and concise."""
 
+        formality_directive = build_formality_directive(target_lang, self.formality)
+        if formality_directive:
+            prompt += f"\n\n{formality_directive}"
         if comment:
             prompt += f"\n\nDeveloper note (context for the string): {comment}"
         if self.custom_instructions:
@@ -379,7 +406,9 @@ CRITICAL RULES:
         src_name = get_language_name(source_lang)
         tgt_name = get_language_name(target_lang)
 
-        prompt = self._build_prompt(masked.masked, src_name, tgt_name, context)
+        prompt = self._build_prompt(
+            masked.masked, src_name, tgt_name, context, target_lang=target_lang
+        )
 
         # Call API with retries
         translated_masked = await self._call_api(prompt)
@@ -449,7 +478,9 @@ CRITICAL RULES:
         # Process in batches
         for batch_start in range(0, len(to_translate), self.batch_size):
             batch = to_translate[batch_start : batch_start + self.batch_size]
-            batch_results = await self._translate_batch_items(batch, src_name, tgt_name)
+            batch_results = await self._translate_batch_items(
+                batch, src_name, tgt_name, target_lang=target_lang
+            )
 
             for (idx, req, _, placeholders), translated_masked in zip(batch, batch_results):
                 translated = unmask_placeholders(translated_masked, placeholders)
@@ -469,11 +500,14 @@ CRITICAL RULES:
         items: list[tuple[int, TranslationRequest, str, dict[str, str]]],
         src_name: str,
         tgt_name: str,
+        target_lang: str = "",
     ) -> list[str]:
         """Translate a batch of items using a single API call."""
         if len(items) == 1:
             _, req, masked_text, _ = items[0]
-            prompt = self._build_prompt(masked_text, src_name, tgt_name, req.comment)
+            prompt = self._build_prompt(
+                masked_text, src_name, tgt_name, req.comment, target_lang=target_lang
+            )
             result = await self._call_api(prompt)
             return [result]
 
@@ -488,12 +522,21 @@ CRITICAL RULES:
                 contexts.append(f"Item {i + 1}: {req.comment}")
 
         batch_text = "\n\n".join(texts)
-        prompt = self._build_batch_prompt(batch_text, len(items), src_name, tgt_name, contexts)
+        prompt = self._build_batch_prompt(
+            batch_text, len(items), src_name, tgt_name, contexts, target_lang=target_lang
+        )
 
         response = await self._call_api(prompt)
         return self._parse_batch_response(response, len(items))
 
-    def _build_prompt(self, text: str, src_name: str, tgt_name: str, context: str | None) -> str:
+    def _build_prompt(
+        self,
+        text: str,
+        src_name: str,
+        tgt_name: str,
+        context: str | None,
+        target_lang: str = "",
+    ) -> str:
         """Build translation prompt for single text."""
         prompt = f"""Translate the following text from {src_name} to {tgt_name}.
 
@@ -505,6 +548,10 @@ IMPORTANT RULES:
 
         if self.custom_instructions:
             prompt += f"\n5. {self.custom_instructions}"
+
+        formality_directive = build_formality_directive(target_lang, self.formality)
+        if formality_directive:
+            prompt += f"\n\n{formality_directive}"
 
         if self.app_context:
             prompt += f"\n\nApp Context:\n{self.app_context}"
@@ -524,6 +571,7 @@ IMPORTANT RULES:
         src_name: str,
         tgt_name: str,
         contexts: list[str] | None = None,
+        target_lang: str = "",
     ) -> str:
         """Build translation prompt for batch."""
         prompt = f"""Translate the following {count} texts from {src_name} to {tgt_name}.
@@ -539,6 +587,10 @@ CRITICAL RULES:
 
         if self.custom_instructions:
             prompt += f"\n8. {self.custom_instructions}"
+
+        formality_directive = build_formality_directive(target_lang, self.formality)
+        if formality_directive:
+            prompt += f"\n\n{formality_directive}"
 
         if self.app_context:
             prompt += f"\n\nApp Context:\n{self.app_context}"

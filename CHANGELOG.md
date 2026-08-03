@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `--formality` option (and matching `formality` config field) to pin the form of address in the target language: `informal` (German `du`, French `tu`, Portuguese `tu`/`você`, Russian `ты`), `formal` (`Sie`/`vous`/`вы`) or `auto` (the previous behaviour). Available on `translate`, `metadata`, `android`, `chrome`, `i18n`, `frameit` and `screenshots`, and honoured by every prompt those commands build — plain strings, batches, CLDR plurals, App Store / Chrome Web Store fields, screenshot texts and frameit strings. Region-aware: `pt-PT` informal is `tu`, while `pt-BR` informal is `você`, and languages without a T–V distinction fall back to tone guidance.
+- `localizerx/utils/formality.py`: per-language familiar/polite address forms for ~30 languages, plus normalization that accepts pronoun spellings (`--formality du`, `--formality vous`).
+
+### Fixed
+- Translations no longer default to the polite register regardless of the product's tone of voice. Because English does not mark the T–V distinction, the model consistently chose `Sie`/`você`/`vous` for German, Portuguese and French, and every string had to be rewritten by hand for products that address users informally.
+- Translation cache key now includes the form of address, the custom instructions, and the app context. Previously, re-running a translation after changing any of those returned the previously cached wording, so a changed tone of voice appeared to have no effect.
+- `lrx i18n`, `lrx android`, `lrx chrome`, `lrx metadata` and `lrx screenshots` now pass `custom_instructions` from the config to the translator. They were silently ignoring the configured instructions.
+- `lrx frameit` now falls back to `custom_instructions` from the config when `--custom-prompt` is not given.
+- The `--on-limit retry` shorten prompt now asks the model to preserve the form of address of the current translation, so shortening an over-limit field no longer flips the register.
+
 ### Changed
 - App Store `keywords` field is now localized as ASO research, not literal translation. The model is prompted as an ASO expert for the target market with full app context (name, subtitle, promotional text, description) and may drop weak keywords, add high-value local search terms, swap synonyms, and reorder by priority — instead of mechanically translating each source keyword. Keywords are always sent in a separate API call (no longer mixed into the multi-field batch prompt) so the ASO framing is preserved even when other fields are translated in the same run. The 100-character hard limit and comma-separated format are still enforced.
 

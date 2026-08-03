@@ -10,7 +10,13 @@ from typing import Annotated, Optional
 import typer
 from rich.table import Table
 
-from localizerx.cli.utils import console, create_progress
+from localizerx.cli.utils import (
+    FORMALITY_HELP,
+    announce_formality,
+    console,
+    create_progress,
+    resolve_formality,
+)
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.gemini_adapter import GeminiTranslator
 from localizerx.adapters.repository import MetadataCatalogRepository
@@ -208,6 +214,13 @@ def metadata(
             max=2.0,
         ),
     ] = None,
+    formality: Annotated[
+        Optional[str],
+        typer.Option(
+            "--formality",
+            help=FORMALITY_HELP,
+        ),
+    ] = None,
 ) -> None:
     """Translate fastlane App Store metadata to target locales."""
     from localizerx.io.metadata import detect_all_metadata_paths
@@ -252,6 +265,7 @@ def metadata(
             backup=backup,
             model=model,
             temperature=temperature,
+            formality=formality,
         )
 
 
@@ -712,6 +726,7 @@ def _run_metadata_translate(
     backup: bool,
     model: str | None,
     temperature: float | None,
+    formality: str | None = None,
 ) -> None:
     """Core metadata translation logic."""
     from localizerx.io.metadata import read_metadata
@@ -760,7 +775,10 @@ def _run_metadata_translate(
     cache_dir = get_cache_dir(config)
     actual_model = model or config.metadata.model
     actual_temperature = temperature if temperature is not None else config.metadata.temperature
-    
+    actual_formality = resolve_formality(formality, config.metadata.formality)
+    announce_formality(actual_formality)
+
+
     thinking_level = getattr(config.metadata, "thinking_level", "0")
     thinking_config = (
         {"thinkingLevel": thinking_level} if thinking_level not in ("0", "none", "") else None
@@ -847,6 +865,8 @@ def _run_metadata_translate(
             max_retries=config.metadata.max_retries,
             cache_dir=cache_dir,
             temperature=actual_temperature,
+            custom_instructions=config.metadata.custom_instructions,
+            formality=actual_formality,
         ) as translator:
             
             use_case = TranslateMetadataUseCase(repository=repository, translator=translator)

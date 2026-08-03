@@ -9,7 +9,13 @@ from typing import Annotated, Optional
 import typer
 from rich.table import Table
 
-from localizerx.cli.utils import console, create_progress
+from localizerx.cli.utils import (
+    FORMALITY_HELP,
+    announce_formality,
+    console,
+    create_progress,
+    resolve_formality,
+)
 from localizerx.config import get_cache_dir, load_config
 from localizerx.translator.gemini_adapter import GeminiTranslator
 from localizerx.adapters.repository import ScreenshotsCatalogRepository
@@ -91,6 +97,13 @@ def screenshots_translate(
             help="Gemini model to use (see 'localizerx models' for list)",
         ),
     ] = None,
+    formality: Annotated[
+        Optional[str],
+        typer.Option(
+            "--formality",
+            help=FORMALITY_HELP,
+        ),
+    ] = None,
 ) -> None:
     """Translate App Store screenshot texts to target languages.
 
@@ -106,6 +119,7 @@ def screenshots_translate(
         overwrite=overwrite,
         backup=backup,
         model=model,
+        formality=formality,
     )
 
 
@@ -715,6 +729,7 @@ def _run_screenshots_translate(
     overwrite: bool,
     backup: bool,
     model: str | None,
+    formality: str | None = None,
 ) -> None:
     """Core screenshots translation logic."""
     from localizerx.io.screenshots import (
@@ -830,6 +845,8 @@ def _run_screenshots_translate(
         cache_dir = get_cache_dir(config)
         actual_model = model or ss_cfg.model
         thinking_config = {"thinkingLevel": ss_cfg.thinking_level}
+        actual_formality = resolve_formality(formality, ss_cfg.formality)
+        announce_formality(actual_formality)
 
         async with GeminiTranslator(
             thinking_config=thinking_config,
@@ -837,6 +854,8 @@ def _run_screenshots_translate(
             max_retries=config.translator.max_retries,
             cache_dir=cache_dir,
             temperature=ss_cfg.temperature,
+            custom_instructions=ss_cfg.custom_instructions,
+            formality=actual_formality,
         ) as translator:
             
             use_case = TranslateScreenshotsUseCase(repository=repository, translator=translator)
