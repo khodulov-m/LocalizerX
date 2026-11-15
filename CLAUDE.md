@@ -2,217 +2,75 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## What this is
 
-LocalizerX (or `lrx` for short) is a Python CLI tool for macOS that automates translation of Xcode String Catalogs (`.xcstrings` files), App Store metadata, App Store screenshot texts, Chrome Extension `_locales/` message files, Android `strings.xml`, and frontend i18n JSON files using Google's Gemini API. It handles placeholder preservation, pluralization rules, and developer comments while translating localization files across all supported platforms.
+LocalizerX (`lrx`, also `localizerx`) is a Python 3.10+ CLI for macOS that translates localization
+files through the Gemini API: Xcode `.xcstrings`, fastlane/App Store metadata, App Store screenshot
+texts and Frameit strings, Chrome Extension `_locales/`, Android `strings.xml` and frontend i18n
+JSON. It keeps placeholders, plural rules and developer comments intact. The package version is in
+`pyproject.toml`; `CHANGELOG.md` lists changes under `[Unreleased]`.
 
-## AI Agent Skills
+The agent skill `skills/localizerx/SKILL.md` (name `use-localizerx`) teaches other agents how to run
+the CLI. Keep it in step with the commands and flags you change.
 
-This repository includes an Agent Skill located at `skills/localizerx/SKILL.md` that enables Claude Code and other compatible AI agents to easily use the `localizerx` CLI tool for automating translation tasks across the project. Use the skill instructions when tasked with localization.
-
-## Development Commands
+## Commands
 
 ```bash
-# Linting
-ruff check .
-
-# Formatting
-black .
-
-# Testing
-uv run python -m pytest
-
-# Run single test
+GEMINI_API_KEY=test uv run python -m pytest        # the whole suite; needs any key value, see below
 uv run python -m pytest tests/test_file.py::test_function
-
-# Install locally (editable)
-pip install -e ".[dev]"
-
-# Run CLI
-localizerx translate <path> --to fr,es,de --src en
-
-# Remove languages
-localizerx translate <path> --remove fr,de,it
-localizerx android --remove fr,es
-
-# Translate with custom instructions
-localizerx translate <path> --to fr,es,de --custom-prompt "Do not translate proper names. Do not translate the word 'Water'"
-
-# Pin the form of address (du/tu/ты instead of Sie/vous/вы)
-localizerx translate <path> --to de,fr,pt-PT --formality informal
-localizerx i18n --to de,pt-PT --formality informal
-
-# Run delete command
-localizerx delete fr,de --backup
-localizerx delete --all --yes
-localizerx delete ru --keep
-
-# Utility commands
-localizerx list              # List available Gemini models
-localizerx use gemini-2.5-flash-lite  # Set active model in config
-localizerx languages         # List supported locale codes
-localizerx cache-clear       # Clear SQLite translation cache
+uv run --extra dev ruff check .                    # dev tools sit in an extra, plain `uv run` lacks them
+uv run --extra dev black .                         # line length 100 (ruff and black)
+uv run localizerx <command> --help                 # the commands and flags live in the CLI, not here
 ```
+
+- **Tests need `GEMINI_API_KEY` set to any value**: about 30 CLI tests fail with "Gemini API key
+  required" without it. No test may call the real API; mock the translator.
+- **Lint is not clean on `master`**: `ruff check .` and `black --check .` report old findings. Do
+  not mass-reformat; keep new and changed code clean.
+- Real runs need a real `GEMINI_API_KEY`. User config: `~/.config/localizerx/config.toml` (per-command
+  sections, `formality`, `custom_instructions`); cache: `~/.cache/localizerx`.
 
 ## Architecture
 
-The project follows Clean Architecture. Business logic is isolated from the CLI framework; orchestration happens in Use Cases, which depend on abstract Ports.
+Clean Architecture: CLI (Typer) → use cases → ports → adapters.
 
-```
-CLI (Typer)  [localizerx/cli/]
- └─ Use Cases  [localizerx/core/use_cases/]
-     └─ Ports (abstract)  [localizerx/core/ports/]
-         └─ Adapters (concrete)  [localizerx/adapters/]
-             └─ I/O handlers  [localizerx/io/]
-             └─ Gemini API Adapter  [localizerx/translator/gemini_adapter.py]
-                 └─ Post-processing (placeholders, plurals)
-```
+- `localizerx/cli/`: one module per format or command group (`translate`, `delete`, `metadata`,
+  `android`, `chrome`, `i18n`, `screenshots`, `frameit`, `agent`); commands are registered at the
+  bottom of `cli/__init__.py`, which also holds `list`, `use`, `languages`, `cache-clear`.
+- `localizerx/core/use_cases/`: per-format orchestrators, framework-agnostic.
+  `core/ports/repository.py` is the cache port, `adapters/repository.py` the SQLite cache.
+- `localizerx/io/`: lossless read/write per format. `localizerx/parser/`: Pydantic domain models.
+- `localizerx/translator/`: `base.py` (abstract translator), `gemini_adapter.py` (async), and
+  `*_prompts.py` (ASO prompts for metadata, screenshots, Chrome Web Store, Frameit).
+- `localizerx/utils/`: `placeholders.py` (masking), `plural_rules.py` (CLDR categories),
+  `formality.py` (T-V address), `limits.py` (App Store and Chrome Web Store character limits),
+  `locale.py`, `context.py` (app context for prompts).
+- `localizerx/config.py`: TOML config.
 
-### Package Structure
+## Invariants
 
-- `localizerx/cli/` - Typer-based CLI commands (one module per format/command group)
-  - `translate.py` - `.xcstrings` translation and `info` command
-  - `delete.py` - Delete languages from `.xcstrings` files
-  - `metadata.py` - App Store metadata + `metadata-info`, `metadata-check`, `metadata-urls`
-  - `android.py` - Android `strings.xml` + `android-info`
-  - `chrome.py` - Chrome Extension `_locales/` + `chrome-info`
-  - `i18n.py` - Frontend i18n JSON + `i18n-info`
-  - `screenshots.py` - Screenshot texts: translate, generate, info
-  - `frameit.py` - Fastlane Frameit title/keyword strings
-  - `agent.py` - `init-agent` command
-- `localizerx/core/use_cases/` - Format-specific translation orchestrators (framework-agnostic)
-- `localizerx/core/ports/repository.py` - Abstract cache/repository interface
-- `localizerx/adapters/repository.py` - SQLite cache implementation
-- `localizerx/config.py` - Configuration management (TOML)
-- `localizerx/io/` - Lossless file I/O per format
-  - `xcstrings.py`, `extension.py`, `screenshots.py`, `android.py`, `frameit.py`, `i18n.py`, `metadata.py`
-- `localizerx/parser/` - Domain entities and Pydantic data models
-  - `model.py` - `Entry`, `Translation` (xcstrings)
-  - `extension_model.py` - `ExtensionMessage`, `ExtensionCatalog`
-  - `screenshots_model.py` - `ScreenshotsCatalog`, `ScreenshotScreen`, `ScreenshotText`
-  - `android_model.py` - `AndroidString`, `AndroidPlural`, `AndroidCatalog`
-  - `frameit_model.py` - `FrameitString`, `FrameitCatalog`
-  - `i18n_model.py` - `I18nMessage`, `I18nCatalog`
-  - `metadata_model.py` - `MetadataField`, `MetadataCatalog`, `MetadataFieldType`
-  - `app_context.py` - `AppContext` data class for screenshot text generation
-- `localizerx/translator/base.py` - Abstract translator interface
-- `localizerx/translator/gemini_adapter.py` - Gemini API implementation (async)
-- `localizerx/translator/extension_prompts.py` - SEO-optimized prompts for Chrome Web Store fields
-- `localizerx/translator/metadata_prompts.py` - ASO-optimized prompts for App Store metadata
-- `localizerx/translator/frameit_prompts.py` - Prompts for Frameit title/keyword strings
-- `localizerx/translator/screenshots_prompts.py` - ASO-optimized prompts for screenshot text translation
-- `localizerx/translator/screenshots_generation_prompts.py` - ASO-optimized prompts for screenshot text generation
-- `localizerx/utils/placeholders.py` - Placeholder masking/unmasking (%@, %d, {name}, $NAME$, $1, HTML/XML tags, CDATA, escape sequences, Markdown link URLs)
-- `localizerx/utils/plural_rules.py` - CLDR plural categories and number-range rules per language (drives plural-translation prompts)
-- `localizerx/utils/formality.py` - Form of address (T–V distinction) per language; turns `auto`/`formal`/`informal` into a prompt directive
-- `localizerx/utils/locale.py` - Language/locale mapping
-- `localizerx/utils/limits.py` - Character limit validation (App Store + Chrome Web Store)
-- `localizerx/utils/context.py` - App context extraction (from metadata, workspace, project)
+- **Lossless I/O**: read then write must reproduce the file exactly, adding only translations.
+  Cover every I/O change with a round-trip test.
+- **Placeholder masking**: `%@`, `{name}`, `$1`, HTML/XML tags, CDATA, escapes and Markdown link
+  URLs are masked to `__PH_n__` before translation and restored after. Extend `placeholders.py`
+  (and its tests) for a new syntax instead of patching prompts.
+- **CLDR plurals**: for xcstrings and Android `<plurals>` one API call carries all source forms plus
+  the target language's categories and number ranges, so `one`/`other` can grow into
+  `one`/`few`/`many`/`other`. Do not split plural forms into separate calls.
+- **Formality** (`--formality auto|formal|informal`, config field per command) is injected into
+  every prompt builder that knows the target language; `auto` must leave prompts byte-identical to
+  the pre-setting behaviour.
+- **Cache keys** include formality, custom instructions and app context (plurals also the developer
+  comment). A new prompt-affecting input must join the key, or old wording comes back stale.
+- **Translator stays provider-agnostic** behind `translator/base.py`; keep Gemini specifics in
+  `gemini_adapter.py`.
+- **Character limits** (App Store, Chrome Web Store) are checked after translation; what happens to
+  an over-limit field depends on the limit action (warn, or retry-shorten and truncate as the last
+  resort). Keep the warning in the output whenever a field was changed.
 
-### Key Design Principles
+## Workspace notes
 
-- **Lossless parsing**: `read → write` must preserve structure exactly, only adding translations
-- **Translator abstraction**: Provider-agnostic interface allows swapping Gemini for other APIs
-- **Placeholder masking**: Mask placeholders, HTML/CDATA, escape sequences, and Markdown link URLs before translation (`%@` → `__PH_1__`, `<b>` → `__PH_2__`, …), restore after
-- **CLDR-aware plurals**: For xcstrings and Android `<plurals>`, the translator sends all source forms in one API call along with the target language's CLDR categories and number-range rules, so it can emit every required category (e.g. expand English `one`/`other` to Russian `one`/`few`/`many`/`other`)
-- **Form of address**: `formality` (`auto`/`formal`/`informal`, CLI `--formality`, config field per command) pins the T–V register in the target language. The directive is injected into every prompt builder that knows the target language; `auto` leaves prompts byte-identical to the pre-setting behaviour
-- **SQLite caching**: Translations are cached locally to avoid redundant API calls. Cache keys include the formality, custom instructions, and app context, so changing any of them re-translates instead of returning stale wording. Plural cache keys additionally include the developer comment
-- **Custom instructions**: Support for custom translation rules via `--custom-prompt` CLI option or `custom_instructions` config field
-
-### Data Models
-
-```python
-# xcstrings
-Entry:
-  key: str
-  source_text: str
-  comment: str | None
-  translations: dict[lang, Translation]
-
-Translation:
-  value: str
-  variations: dict | None  # for plural/gender forms
-
-# Chrome Extension
-ExtensionMessage:
-  key: str
-  message: str
-  description: str | None
-  placeholders: dict | None
-
-ExtensionCatalog:
-  source_locale: str
-  locales: dict[str, ExtensionLocale]
-
-# Screenshots
-ScreenshotText:
-  small: str | None  # for compact devices (iPhone SE)
-  large: str | None  # for large devices (iPad, Pro Max)
-
-ScreenshotScreen:
-  texts: dict[ScreenshotTextType, ScreenshotText]
-
-ScreenshotsCatalog:
-  source_language: str
-  screens: dict[str, ScreenshotScreen]
-  localizations: dict[str, ScreenshotLocale]
-
-# Android
-AndroidString:
-  name: str
-  value: str
-  translatable: bool
-
-AndroidPlural:
-  name: str
-  items: dict[str, str]  # quantity → string
-
-AndroidCatalog:
-  source_language: str
-  strings: list[AndroidString]
-  arrays: list[AndroidStringArray]
-  plurals: list[AndroidPlural]
-
-# Frontend i18n
-I18nMessage:
-  key: str
-  value: str
-
-I18nCatalog:
-  source_locale: str
-  locales: dict[str, I18nLocale]
-
-# Fastlane metadata
-MetadataField:
-  field_type: MetadataFieldType
-  value: str
-
-MetadataCatalog:
-  source_language: str
-  locales: dict[str, LocaleMetadata]
-
-# Frameit
-FrameitString:
-  key: str
-  value: str
-
-FrameitCatalog:
-  source_language: str
-  locales: dict[str, FrameitLocale]
-
-# App context (for screenshot generation)
-AppContext:
-  name: str
-  subtitle: str | None
-  promo_text: str | None
-  description: str | None
-  keywords: list[str] | None
-```
-
-## Environment Variables
-
-- `GEMINI_API_KEY` - Required for translation API access
-
-## Configuration
-
-User config location: `~/.config/localizerx/config.toml`
+- The workspace no longer translates its own app repos with `lrx` (the agent does it directly); the
+  tool and the skill stay maintained for other users.
+- This is a public repo: no personal paths, keys or private project names in code, docs or commits.
+- Commits use Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`).
